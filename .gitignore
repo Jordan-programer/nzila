@@ -1,0 +1,28 @@
+# Python virtual environments and caches
+backend/venv/
+backend/db.sqlite3
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env
+frontend/.env.*
+frontend/*.tsbuildinfo
+
+# IDEs and OS-specific files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Scratch and temp files
+frontend/scratch_home.html
