@@ -371,7 +371,7 @@ export default function ClientDashboardPage() {
           <div className="w-full max-w-2xl bg-card border border-border rounded-3xl overflow-hidden shadow-2xl animate-bounce-in flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between px-6 py-4 bg-muted border-b border-border">
               <span className="text-xs font-bold text-muted-foreground font-mono">
-                Nzila Central de Notificações
+                NZILA Central de Notificações
               </span>
               <button
                 onClick={() => setSelectedEmail(null)}
@@ -385,7 +385,7 @@ export default function ClientDashboardPage() {
               <div>
                 <span className="font-semibold text-muted-foreground inline-block w-16">De:</span>
                 <span className="font-semibold text-foreground">
-                  Nzila &lt;notificacoes@nzila.co.ao&gt;
+                  NZILA &lt;notificacoes@nzila.co.ao&gt;
                 </span>
               </div>
               <div>
@@ -405,7 +405,7 @@ export default function ClientDashboardPage() {
             <div className="p-6 bg-slate-50 flex-1 overflow-y-auto font-sans text-sm">
               <div className="max-w-xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden text-slate-800">
                 <div className="bg-emerald-600 p-6 text-center text-white">
-                  <h2 className="text-2xl font-black tracking-tight">Nzila</h2>
+                  <h2 className="text-2xl font-black tracking-tight">NZILA</h2>
                   <p className="text-xs text-emerald-100 font-medium tracking-wide mt-1">
                     Sua Viagem em Segurança
                   </p>
@@ -459,7 +459,7 @@ export default function ClientDashboardPage() {
                   )}
 
                   <p className="text-xs text-slate-400 border-t border-slate-200 pt-4 text-center">
-                    Este é um e-mail de notificação automático do sistema Nzila. Não responda a esta
+                    Este é um e-mail de notificação automático do sistema NZILA. Não responda a esta
                     mensagem.
                   </p>
                 </div>

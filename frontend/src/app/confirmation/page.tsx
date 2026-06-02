@@ -249,7 +249,7 @@ function ConfirmationContent() {
               <div className="max-w-xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden text-slate-800">
                 {/* Logo Header */}
                 <div className="bg-emerald-600 p-6 text-center text-white">
-                  <h2 className="text-2xl font-black tracking-tight">Nzila</h2>
+                  <h2 className="text-2xl font-black tracking-tight">NZILA</h2>
                   <p className="text-xs text-emerald-100 font-medium tracking-wide mt-1">
                     Viagens Interprovinciais Facilitadas
                   </p>
@@ -260,7 +260,7 @@ function ConfirmationContent() {
                     Olá, {reservation.passengerName}!
                   </p>
                   <p>
-                    Agradecemos a sua preferência pelo Nzila. O seu pagamento foi processado com
+                    Agradecemos a sua preferência pelo NZILA. O seu pagamento foi processado com
                     sucesso e o seu lugar está garantido!
                   </p>
 
@@ -298,7 +298,7 @@ function ConfirmationContent() {
 
                   <div className="border-t border-slate-200 pt-4 text-center">
                     <span className="text-xs text-slate-400 font-medium block">
-                      Nzila Angola - 2026. Todos os direitos reservados.
+                      NZILA Angola - 2026. Todos os direitos reservados.
                     </span>
                   </div>
                 </div>

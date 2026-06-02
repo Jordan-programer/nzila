@@ -53,9 +53,9 @@ export default function Header() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
         <div className="flex items-center justify-between h-16 lg:h-18">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <AppLogo size={36} className="text-primary" />
-            <span className="font-bold text-xl tracking-tight text-primary">Nzila</span>
+          <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
+            <AppLogo size={38} />
+            <span className="font-black text-2xl tracking-wider text-foreground">NZILA</span>
           </Link>
 
           {/* Desktop Nav */}

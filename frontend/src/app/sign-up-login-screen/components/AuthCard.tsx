@@ -15,9 +15,9 @@ export default function AuthCard() {
     <div className="w-full max-w-md">
       {/* Logo */}
       <div className="flex flex-col items-center mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <AppLogo size={40} />
-          <span className="font-bold text-2xl text-primary">Nzila</span>
+        <div className="flex items-center gap-2.5 mb-2">
+          <AppLogo size={42} />
+          <span className="font-black text-2xl tracking-wider text-primary">NZILA</span>
         </div>
         <p className="text-sm text-muted-foreground text-center">
           {activeTab === 'login'
