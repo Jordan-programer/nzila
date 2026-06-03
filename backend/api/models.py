@@ -1,81 +1,278 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+# 👤 1. UTILIZADORES (extends User, mapped to table 'users')
 class UserProfile(models.Model):
+    ROLE_CHOICES = [
+        ('CLIENTE', 'CLIENTE'),
+        ('ADMIN', 'ADMIN'),
+        ('OPERADOR', 'OPERADOR'),
+    ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=50, blank=True, null=True)
+    nome = models.CharField(max_length=100)
+    email = models.EmailField(max_length=100, unique=True)
+    telefone = models.CharField(max_length=20, blank=True, null=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='CLIENTE')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    # Frontend compatibility fields
     document = models.CharField(max_length=100, blank=True, null=True)
     avatar = models.URLField(max_length=500, blank=True, null=True)
-    is_admin = models.BooleanField(default=False)
+    company = models.ForeignKey('Company', on_delete=models.SET_NULL, blank=True, null=True, related_name='profiles')
+
+    class Meta:
+        db_table = 'users'
 
     def __str__(self):
-        return self.name
+        return self.nome
 
-class Carrier(models.Model):
-    name = models.CharField(max_length=255)
-    code = models.CharField(max_length=50, unique=True)
-    color = models.CharField(max_length=100)
+# 🏢 2. EMPRESAS TRANSPORTADORAS
+class Company(models.Model):
+    STATUS_CHOICES = [
+        ('PENDENTE', 'PENDENTE'),
+        ('APROVADA', 'APROVADA'),
+        ('REJEITADA', 'REJEITADA'),
+        ('SUSPENSA', 'SUSPENSA'),
+    ]
+    nome = models.CharField(max_length=100)
+    nome_comercial = models.CharField(max_length=100, blank=True, null=True)
+    code = models.CharField(max_length=50, blank=True, null=True)
+    nif = models.CharField(max_length=50, blank=True, null=True, unique=True)
+    ano_fundacao = models.IntegerField(blank=True, null=True)
+    tipo_empresa = models.CharField(max_length=50, blank=True, null=True)
+    
+    provincia = models.CharField(max_length=100, blank=True, null=True)
+    municipio = models.CharField(max_length=100, blank=True, null=True)
+    endereco = models.TextField(blank=True, null=True)
+    
+    telefone = models.CharField(max_length=20, blank=True, null=True)
+    telefone_alt = models.CharField(max_length=20, blank=True, null=True)
+    email = models.EmailField(max_length=100, blank=True, null=True)
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
+    motivo_rejeicao = models.TextField(blank=True, null=True)
+    logo_url = models.CharField(max_length=250, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Frontend compatibility fields
+    descricao = models.TextField(blank=True, null=True)
+    color = models.CharField(max_length=100, default='bg-blue-600')
     rating = models.FloatField(default=4.5)
-    reviews = models.IntegerField(default=0)
+    reviews = models.IntegerField(default=100)
+    politica_cancelamento = models.TextField(blank=True, null=True)
+
+    class Meta:
+        db_table = 'companies'
 
     def __str__(self):
-        return self.name
+        return self.nome
 
+class CompanyDocument(models.Model):
+    TIPO_CHOICES = [
+        ('REGISTO_COMERCIAL', 'REGISTO_COMERCIAL'),
+        ('ALVARA', 'ALVARA'),
+        ('CONTRIBUINTE', 'CONTRIBUINTE'),
+        ('ESTATUTOS', 'ESTATUTOS'),
+    ]
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='documents')
+    tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
+    arquivo_url = models.TextField()
+    aprovado = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'company_documents'
+
+    def __str__(self):
+        return f"{self.tipo} - {self.company.nome}"
+
+class CompanyAdmin(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='admins')
+    nome = models.CharField(max_length=100)
+    email = models.EmailField(max_length=100, unique=True)
+    telefone = models.CharField(max_length=20)
+    password = models.CharField(max_length=255)
+    cargo = models.CharField(max_length=100, blank=True, null=True)
+    documento_identificacao = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        db_table = 'company_admin'
+
+    def __str__(self):
+        return f"{self.nome} ({self.company.nome})"
+
+# 📍 3. PROVÍNCIAS / CIDADES
+class Location(models.Model):
+    nome = models.CharField(max_length=100)
+    provincia = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'locations'
+
+    def __str__(self):
+        return f"{self.nome} ({self.provincia})"
+
+# 🛣️ 4. ROTAS
+class Route(models.Model):
+    origem = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='routes_from')
+    destino = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='routes_to')
+    distancia_km = models.DecimalField(max_digits=10, decimal_places=2)
+    duracao_estimada = models.TimeField()
+
+    class Meta:
+        db_table = 'routes'
+
+    def __str__(self):
+        return f"{self.origem.nome} -> {self.destino.nome}"
+
+# 🚌 5. AUTOCARROS
+class Bus(models.Model):
+    empresa = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='buses')
+    modelo = models.CharField(max_length=100)
+    capacidade = models.IntegerField()
+
+    class Meta:
+        db_table = 'buses'
+
+    def __str__(self):
+        return f"{self.empresa.nome} - {self.modelo} ({self.capacidade} lug)"
+
+# 💺 6. ASSENTOS
+class Seat(models.Model):
+    bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='seats')
+    numero = models.CharField(max_length=10)
+
+    class Meta:
+        db_table = 'seats'
+
+    def __str__(self):
+        return f"{self.numero} ({self.bus.modelo})"
+
+# 💺 7. VIAGENS
 class Trip(models.Model):
-    carrier = models.ForeignKey(Carrier, on_delete=models.CASCADE, related_name='trips')
-    origin = models.CharField(max_length=100)
-    destination = models.CharField(max_length=100)
-    departure_time = models.CharField(max_length=50)
-    arrival_time = models.CharField(max_length=50)
-    duration_minutes = models.IntegerField(default=0)
-    duration_label = models.CharField(max_length=100)
-    class_type = models.CharField(max_length=100) # economica, executiva, vip
-    class_label = models.CharField(max_length=100) # Económica, Executiva, VIP
-    total_seats = models.IntegerField(default=44)
-    available_seats = models.IntegerField(default=44)
-    price = models.IntegerField(default=0)
-    amenities = models.TextField(default='') # Comma-separated amenities
+    CLASSE_CHOICES = [
+        ('ECONOMICA', 'ECONOMICA'),
+        ('CONFORTO', 'CONFORTO'),
+        ('EXECUTIVA', 'EXECUTIVA'),
+    ]
+    STATUS_CHOICES = [
+        ('ATIVA', 'ATIVA'),
+        ('CANCELADA', 'CANCELADA'),
+    ]
+    empresa = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='trips')
+    route = models.ForeignKey(Route, on_delete=models.CASCADE, related_name='trips')
+    bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='trips')
+    
+    data_saida = models.DateField()
+    hora_saida = models.TimeField()
+    hora_chegada = models.TimeField()
+    
+    preco_ida = models.DecimalField(max_digits=10, decimal_places=2)
+    preco_ida_volta = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    classe = models.CharField(max_length=50, choices=CLASSE_CHOICES)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='ATIVA')
+    
+    # Frontend compatibility
+    amenities = models.TextField(default='ar-condicionado,wifi,tomada')
+
+    class Meta:
+        db_table = 'trips'
 
     def __str__(self):
-        return f"{self.carrier.code} | {self.origin} -> {self.destination} ({self.departure_time})"
+        return f"{self.empresa.nome} | {self.route} | {self.data_saida} {self.hora_saida}"
 
     def get_amenities_list(self):
         if not self.amenities:
             return []
         return [a.strip() for a in self.amenities.split(',')]
 
+# 🎫 8. RESERVAS
 class Reservation(models.Model):
     STATUS_CHOICES = [
-        ('PENDENTE', 'Pendente'),
-        ('CONFIRMADO', 'Confirmado'),
-        ('CANCELADO', 'Cancelado'),
-        ('EMBARCADO', 'Embarcado'),
-        ('UTILIZADO', 'Utilizado'),
+        ('PENDENTE', 'PENDENTE'),
+        ('CONFIRMADA', 'CONFIRMADA'),
+        ('CANCELADA', 'CANCELADA'),
+        ('EMBARCADO', 'EMBARCADO'),
     ]
-
-    id = models.CharField(max_length=100, primary_key=True) # RES-XYZ...
+    codigo_reserva = models.CharField(max_length=50, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reservations')
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='reservations')
-    passenger_name = models.CharField(max_length=255)
-    passenger_email = models.CharField(max_length=255)
-    passenger_phone = models.CharField(max_length=50)
-    passenger_document = models.CharField(max_length=100)
-    seat = models.CharField(max_length=20)
-    price = models.IntegerField(default=0)
-    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='CONFIRMADO')
-    payment_method = models.CharField(max_length=100, blank=True, null=True)
-    payment_date = models.DateTimeField(auto_now_add=True)
-    validation_date = models.CharField(max_length=100, blank=True, null=True)
-    qr_token = models.CharField(max_length=255, unique=True)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='CONFIRMADA')
+    total = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'reservations'
 
     def __str__(self):
-        return f"{self.id} | {self.passenger_name} ({self.status})"
+        return f"{self.codigo_reserva} | {self.user.username} ({self.status})"
 
-class ValidationLog(models.Model):
-    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='validation_logs')
-    validation_time = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=50) # EMBARCADO / UTILIZADO
-    validated_by = models.CharField(max_length=255) # Name of operator
+# 🪑 9. RESERVA DE ASSENTOS
+class ReservationSeat(models.Model):
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='reservation_seats')
+    seat = models.ForeignKey(Seat, on_delete=models.CASCADE, related_name='reservation_seats')
+
+    class Meta:
+        db_table = 'reservation_seats'
 
     def __str__(self):
-        return f"{self.reservation.id} - Checked in by {self.validated_by} at {self.validation_time}"
+        return f"{self.reservation.codigo_reserva} - Assento {self.seat.numero}"
+
+# 💳 10. PAGAMENTOS
+class Payment(models.Model):
+    METODO_CHOICES = [
+        ('MULTICAIXA', 'MULTICAIXA'),
+        ('UNITEL_MONEY', 'UNITEL_MONEY'),
+        ('PAYPAY', 'PAYPAY'),
+    ]
+    STATUS_CHOICES = [
+        ('PENDENTE', 'PENDENTE'),
+        ('PAGO', 'PAGO'),
+        ('FALHOU', 'FALHOU'),
+    ]
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='payments')
+    metodo = models.CharField(max_length=50, choices=METODO_CHOICES)
+    status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='PENDENTE')
+    referencia = models.CharField(max_length=100, blank=True, null=True)
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'payments'
+
+    def __str__(self):
+        return f"Pagamento {self.id} | {self.reservation.codigo_reserva} | {self.status}"
+
+# 🔐 11. QR CODE / TOKEN
+class Ticket(models.Model):
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='tickets')
+    qr_code = models.TextField()
+    token = models.CharField(max_length=255, unique=True)
+    usado = models.BooleanField(default=False)
+    data_validacao = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'tickets'
+
+    def __str__(self):
+        return f"Ticket {self.id} | {self.reservation.codigo_reserva}"
+
+# 📧 12. NOTIFICAÇÕES
+class Notification(models.Model):
+    TIPO_CHOICES = [
+        ('CONFIRMACAO', 'CONFIRMACAO'),
+        ('LEMBRETE', 'LEMBRETE'),
+        ('CANCELAMENTO', 'CANCELAMENTO'),
+    ]
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
+    mensagem = models.TextField()
+    enviado = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'notifications'
+
+    def __str__(self):
+        return f"Notificacao {self.id} | User {self.user.username} | {self.tipo}"

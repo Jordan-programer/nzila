@@ -25,7 +25,8 @@
   --warning: #ffc107;
   --warning-foreground: #0a0f1e;
   --radius: 0.5rem;
-  --font-sans: var(--font-dm-sans), 'DM Sans', sans-serif;
+  --font-sans: var(--font-nunito-sans), 'Nunito Sans', 'Segoe UI', sans-serif;
+  --letter-spacing-ui: -0.01em;
 }
 
 @layer base {
@@ -38,6 +39,7 @@
     background-color: var(--background);
     color: var(--foreground);
     font-family: var(--font-sans);
+    letter-spacing: var(--letter-spacing-ui);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

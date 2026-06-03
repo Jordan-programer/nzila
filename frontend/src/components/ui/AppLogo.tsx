@@ -52,7 +52,7 @@ const AppLogo = memo(function AppLogo({
               <stop offset="50%" stopColor="#10b981" /> {/* Emerald 500 */}
               <stop offset="100%" stopColor="#059669" /> {/* Emerald 600 */}
             </linearGradient>
-            
+
             {/* Dark Green Loop (Depth Layer) */}
             <linearGradient id="nzilaDarkGreenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#047857" /> {/* Emerald 700 */}
@@ -86,22 +86,13 @@ const AppLogo = memo(function AppLogo({
           />
 
           {/* Right Ribbon Stem (Blue Gradient) */}
-          <path
-            d="M 76,20 L 88,20 L 88,80 L 76,80 Z"
-            fill="url(#nzilaBlueGrad)"
-          />
+          <path d="M 76,20 L 88,20 L 88,80 L 76,80 Z" fill="url(#nzilaBlueGrad)" />
 
           {/* Right Ribbon Top Corner Green Cap */}
-          <path
-            d="M 76,20 L 88,20 L 88,12 C 88,12 82,11 76,14 Z"
-            fill="#84cc16"
-          />
+          <path d="M 76,20 L 88,20 L 88,12 C 88,12 82,11 76,14 Z" fill="#84cc16" />
 
           {/* Diagonal Highway (Road) */}
-          <path
-            d="M 5,80 Q 40,50 80,10 L 92,20 Q 52,60 25,90 Z"
-            fill="url(#nzilaRoadGrad)"
-          />
+          <path d="M 5,80 Q 40,50 80,10 L 92,20 Q 52,60 25,90 Z" fill="url(#nzilaRoadGrad)" />
 
           {/* Center Road Dashes (Lane Markings) */}
           <path

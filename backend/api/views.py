@@ -3,6 +3,8 @@ from datetime import datetime
 from django.utils import timezone
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -10,12 +12,20 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.db.models import Sum
 
-from .models import UserProfile, Carrier, Trip, Reservation, ValidationLog
+from .models import (
+    UserProfile, Company, Location, Route, Bus, Seat,
+    Trip, Reservation, ReservationSeat, Payment, Ticket, Notification,
+    CompanyAdmin, CompanyDocument
+)
 from .serializers import (
     UserSerializer,
     TripSerializer,
     ReservationSerializer,
-    ValidationLogSerializer,
+    LocationSerializer,
+    CompanySerializer,
+    CompanyDocumentSerializer,
+    CompanyAdminSerializer,
+    NotificationSerializer,
 )
 
 # ----------------------------------------------------
@@ -25,12 +35,12 @@ from .serializers import (
 @permission_classes([AllowAny])
 def register_user(request):
     data = request.data
-    username = data.get('email') # Use email as username
+    username = data.get('email')
     email = data.get('email')
     password = data.get('password')
     name = data.get('fullName')
     phone = data.get('phone', '')
-    document = data.get('document', '005432168LA045') # Default document if omitted
+    document = data.get('document', '005432168LA045')
 
     if not username or not password or not name:
         return Response({'error': 'Preencha o nome, email e palavra-passe.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -38,17 +48,17 @@ def register_user(request):
     if User.objects.filter(username=username).exists():
         return Response({'error': 'Este email já está registado no sistema.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Create standard auth user
+    # Create User
     user = User.objects.create_user(username=username, email=email, password=password)
     
-    # Create profile details
+    # Create profile mapping to table 'users'
     UserProfile.objects.create(
         user=user,
-        name=name,
-        phone=phone,
+        nome=name,
+        email=email,
+        telefone=phone,
         document=document,
-        avatar='https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-        is_admin=False
+        role='CLIENTE'
     )
 
     token, _ = Token.objects.get_or_create(user=user)
@@ -93,13 +103,13 @@ def list_trips(request):
     carrier = request.query_params.get('carrier')
 
     if origin:
-        trips = trips.filter(origin__icontains=origin)
+        trips = trips.filter(route__origem__nome__icontains=origin)
     if destination:
-        trips = trips.filter(destination__icontains=destination)
+        trips = trips.filter(route__destino__nome__icontains=destination)
     if class_type:
-        trips = trips.filter(class_type=class_type)
+        trips = trips.filter(classe=class_type.upper())
     if carrier:
-        trips = trips.filter(carrier__code=carrier)
+        trips = trips.filter(empresa__code=carrier)
 
     serializer = TripSerializer(trips, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -122,17 +132,17 @@ def trip_details(request, pk):
 @permission_classes([IsAuthenticated])
 def manage_reservations(request):
     if request.method == 'GET':
-        reservations = Reservation.objects.filter(passenger_email=request.user.email).order_by('-payment_date')
+        reservations = Reservation.objects.filter(user__email=request.user.email).order_by('-created_at')
         serializer = ReservationSerializer(reservations, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
         data = request.data
         trip_id = data.get('tripId')
-        seat = data.get('seat')
-        payment_method = data.get('paymentMethod')
+        seat_number = data.get('seat')
+        payment_method = data.get('paymentMethod', 'Multicaixa Express')
 
-        if not trip_id or not seat:
+        if not trip_id or not seat_number:
             return Response({'error': 'Preencha o ID da viagem e a poltrona desejada.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -140,43 +150,106 @@ def manage_reservations(request):
         except Trip.DoesNotExist:
             return Response({'error': 'Viagem não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Pre-populate passenger fields with authenticated profile if matching
-        try:
-            profile = request.user.profile
-            passenger_name = profile.name
-            passenger_phone = profile.phone or data.get('passengerPhone', '')
-            passenger_document = profile.document or data.get('passengerDocument', '')
-        except UserProfile.DoesNotExist:
-            passenger_name = data.get('passengerName', request.user.first_name or request.user.username)
-            passenger_phone = data.get('passengerPhone', '')
-            passenger_document = data.get('passengerDocument', '')
+        # Passenger details
+        passenger_email = data.get('passengerEmail', request.user.email)
+        passenger_name = data.get('passengerName', request.user.profile.nome if hasattr(request.user, 'profile') else request.user.username)
+        passenger_phone = data.get('passengerPhone', '')
+        passenger_document = data.get('passengerDocument', '')
 
-        # Generate custom structured code
-        orig_pref = trip.origin[:3].upper()
-        dest_pref = trip.destination[:3].upper()
+        # Locate/Create User for passenger if booking for someone else
+        try:
+            passenger_user = User.objects.get(email=passenger_email)
+        except User.DoesNotExist:
+            passenger_user = User.objects.create_user(
+                username=passenger_email,
+                email=passenger_email,
+                password=User.objects.make_random_password()
+            )
+            UserProfile.objects.create(
+                user=passenger_user,
+                nome=passenger_name,
+                email=passenger_email,
+                telefone=passenger_phone,
+                document=passenger_document,
+                role='CLIENTE'
+            )
+
+        # Find Seat in Trip's bus
+        try:
+            seat_obj = Seat.objects.get(bus=trip.bus, numero=seat_number)
+        except Seat.DoesNotExist:
+            # Fallback auto-create for demo resilience
+            seat_obj = Seat.objects.create(bus=trip.bus, numero=seat_number)
+
+        # Validate Seat and Capacity limit
+        is_occupied = ReservationSeat.objects.filter(
+            reservation__trip=trip,
+            seat=seat_obj,
+            reservation__status__in=['CONFIRMADA', 'EMBARCADO']
+        ).exists()
+        if is_occupied:
+            return Response({'error': 'Esta poltrona já se encontra ocupada nesta viagem.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        occupied_count = ReservationSeat.objects.filter(
+            reservation__trip=trip,
+            reservation__status__in=['CONFIRMADA', 'EMBARCADO']
+        ).count()
+        if occupied_count >= trip.bus.capacidade:
+            return Response({'error': 'Esta viagem já atingiu a capacidade máxima de lotação.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Generate unique reservation code
+        orig_pref = trip.route.origem.nome[:3].upper()
+        dest_pref = trip.route.destino.nome[:3].upper()
         date_stamp = timezone.now().strftime('%Y%m%d')
         random_hex = ''.join(random.choices('0123456789ABCDEF', k=6))
         code = f"RES-{orig_pref}-{dest_pref}-{date_stamp}-{random_hex}"
 
-        # Create reservation
+        # 1. Save Reservation
         reservation = Reservation.objects.create(
-            id=code,
+            codigo_reserva=code,
+            user=passenger_user,
             trip=trip,
-            passenger_name=passenger_name,
-            passenger_email=request.user.email,
-            passenger_phone=passenger_phone,
-            passenger_document=passenger_document,
-            seat=seat,
-            price=trip.price,
-            status='CONFIRMADO',
-            payment_method=payment_method,
-            qr_token=f"nzila-token-{code}-{random_hex}"
+            status='CONFIRMADA',
+            total=trip.preco_ida
         )
 
-        # Decrement available seats count
-        if trip.available_seats > 0:
-            trip.available_seats -= 1
-            trip.save()
+        # 2. Save ReservationSeat
+        ReservationSeat.objects.create(
+            reservation=reservation,
+            seat=seat_obj
+        )
+
+        # 3. Save Payment
+        method_map = {
+            'Multicaixa Express': 'MULTICAIXA',
+            'Unitel Money': 'UNITEL_MONEY',
+            'PayPay': 'PAYPAY',
+            'Pagamento por referência': 'MULTICAIXA',
+        }
+        metodo = method_map.get(payment_method, 'MULTICAIXA')
+        Payment.objects.create(
+            reservation=reservation,
+            metodo=metodo,
+            status='PAGO',
+            referencia=f"REF-{code}-{random_hex}",
+            valor=trip.preco_ida
+        )
+
+        # 4. Save Ticket (QR/Token)
+        Ticket.objects.create(
+            reservation=reservation,
+            qr_code=f"nzila-qr-code-{code}",
+            token=f"nzila-token-{code}-{random_hex}",
+            usado=False
+        )
+
+        # 5. Save Notification
+        Notification.objects.create(
+            user=passenger_user,
+            tipo='CONFIRMACAO',
+            mensagem=f"Reserva {code} confirmada. Viagem de {trip.route.origem.nome} para {trip.route.destino.nome}.",
+            enviado=True
+        )
 
         serializer = ReservationSerializer(reservation)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -185,9 +258,15 @@ def manage_reservations(request):
 @permission_classes([AllowAny])
 def reservation_details(request, pk):
     try:
-        reservation = Reservation.objects.get(pk=pk)
+        reservation = Reservation.objects.get(codigo_reserva__iexact=pk.strip())
     except Reservation.DoesNotExist:
-        return Response({'error': 'Reserva não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            if pk.strip().isdigit():
+                reservation = Reservation.objects.get(id=int(pk.strip()))
+            else:
+                raise Reservation.DoesNotExist()
+        except Reservation.DoesNotExist:
+            return Response({'error': 'Reserva não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 
     serializer = ReservationSerializer(reservation)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -196,23 +275,32 @@ def reservation_details(request, pk):
 @permission_classes([IsAuthenticated])
 def cancel_reservation(request, pk):
     try:
-        reservation = Reservation.objects.get(pk=pk)
+        reservation = Reservation.objects.get(codigo_reserva__iexact=pk.strip())
     except Reservation.DoesNotExist:
-        return Response({'error': 'Reserva não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            if pk.strip().isdigit():
+                reservation = Reservation.objects.get(id=int(pk.strip()))
+            else:
+                raise Reservation.DoesNotExist()
+        except Reservation.DoesNotExist:
+            return Response({'error': 'Reserva não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if reservation.passenger_email != request.user.email and not getattr(request.user.profile, 'is_admin', False):
+    if reservation.user.email != request.user.email and not getattr(request.user.profile, 'role', '') == 'ADMIN':
         return Response({'error': 'Não tem permissão para cancelar este bilhete.'}, status=status.HTTP_403_FORBIDDEN)
 
-    if reservation.status == 'CANCELADO':
+    if reservation.status == 'CANCELADA':
         return Response({'error': 'Este bilhete já está cancelado.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    reservation.status = 'CANCELADO'
+    reservation.status = 'CANCELADA'
     reservation.save()
 
-    # Re-increment available seats count
-    trip = reservation.trip
-    trip.available_seats += 1
-    trip.save()
+    # Save cancel notification
+    Notification.objects.create(
+        user=reservation.user,
+        tipo='CANCELAMENTO',
+        mensagem=f"A sua reserva {reservation.codigo_reserva} foi cancelada.",
+        enviado=True
+    )
 
     return Response({'success': 'Reserva cancelada com sucesso.'}, status=status.HTTP_200_OK)
 
@@ -220,21 +308,27 @@ def cancel_reservation(request, pk):
 # Boarding Validation (Fiscais)
 # ----------------------------------------------------
 @api_view(['POST'])
-@permission_classes([AllowAny]) # Allow boarding tools to scan
+@permission_classes([AllowAny])
 def scan_ticket(request):
     code = request.data.get('code')
     if not code:
         return Response({'error': 'Código de bilhete em falta.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    ticket_obj = None
     try:
-        res = Reservation.objects.get(id__iexact=code.strip())
-    except Reservation.DoesNotExist:
-        return Response({'status': 'INVALID', 'error': 'Bilhete não encontrado.'}, status=status.HTTP_200_OK)
+        ticket_obj = Ticket.objects.get(token__iexact=code.strip())
+        res = ticket_obj.reservation
+    except Ticket.DoesNotExist:
+        try:
+            res = Reservation.objects.get(codigo_reserva__iexact=code.strip())
+            ticket_obj = res.tickets.first()
+        except Reservation.DoesNotExist:
+            return Response({'status': 'INVALID', 'error': 'Bilhete não encontrado.'}, status=status.HTTP_200_OK)
 
-    if res.status == 'CANCELADO':
+    if res.status == 'CANCELADA':
         return Response({'status': 'INVALID', 'error': 'Este bilhete está cancelado.'}, status=status.HTTP_200_OK)
     
-    if res.status in ['EMBARCADO', 'UTILIZADO']:
+    if res.status == 'EMBARCADO' or (ticket_obj and ticket_obj.usado):
         serializer = ReservationSerializer(res)
         return Response({
             'status': 'ALREADY_USED',
@@ -257,28 +351,32 @@ def confirm_boarding(request):
     if not code:
         return Response({'error': 'Código de bilhete em falta.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    ticket_obj = None
     try:
-        res = Reservation.objects.get(id__iexact=code.strip())
-    except Reservation.DoesNotExist:
-        return Response({'error': 'Bilhete não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+        ticket_obj = Ticket.objects.get(token__iexact=code.strip())
+        res = ticket_obj.reservation
+    except Ticket.DoesNotExist:
+        try:
+            res = Reservation.objects.get(codigo_reserva__iexact=code.strip())
+            ticket_obj = res.tickets.first()
+        except Reservation.DoesNotExist:
+            return Response({'error': 'Bilhete não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if res.status in ['EMBARCADO', 'UTILIZADO']:
+    if res.status == 'EMBARCADO' or (ticket_obj and ticket_obj.usado):
         return Response({'error': 'Bilhete já utilizado.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if res.status == 'CANCELADO':
+    if res.status == 'CANCELADA':
         return Response({'error': 'Este bilhete está cancelado.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    now_str = timezone.now().strftime('%H:%M %d/%m/%Y')
+    now = timezone.now()
     res.status = 'EMBARCADO'
-    res.validation_date = now_str
     res.save()
 
-    # Log check-in
-    ValidationLog.objects.create(
-        reservation=res,
-        status='EMBARCADO',
-        validated_by=operator
-    )
+    # Update Ticket to usado
+    if ticket_obj:
+        ticket_obj.usado = True
+        ticket_obj.data_validacao = now
+        ticket_obj.save()
 
     serializer = ReservationSerializer(res)
     return Response({
@@ -290,18 +388,16 @@ def confirm_boarding(request):
 # Administrative Stats & CRUD
 # ----------------------------------------------------
 @api_view(['GET'])
-@permission_classes([AllowAny]) # Simplify demo dashboard access
+@permission_classes([AllowAny])
 def admin_stats(request):
-    # Total revenue (sum of not-cancelled reservations)
-    revenue = Reservation.objects.exclude(status='CANCELADO').aggregate(Sum('price'))['price__sum'] or 0
+    revenue = Reservation.objects.exclude(status='CANCELADA').aggregate(Sum('total'))['total__sum'] or 0
     total_sales = Reservation.objects.count()
-    active_sales = Reservation.objects.exclude(status='CANCELADO').count()
+    active_sales = Reservation.objects.exclude(status='CANCELADA').count()
     
-    # Today stats
     today_str = timezone.now().date()
-    today_res = Reservation.objects.filter(payment_date__date=today_str)
+    today_res = Reservation.objects.filter(created_at__date=today_str)
     today_count = today_res.count()
-    today_revenue = today_res.exclude(status='CANCELADO').aggregate(Sum('price'))['price__sum'] or 0
+    today_revenue = today_res.exclude(status='CANCELADA').aggregate(Sum('total'))['total__sum'] or 0
 
     occupancy = 78
     if total_sales > 0:
@@ -320,6 +416,614 @@ def admin_stats(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def admin_all_reservations(request):
-    reservations = Reservation.objects.all().order_by('-payment_date')
+    reservations = Reservation.objects.all().order_by('-created_at')
     serializer = ReservationSerializer(reservations, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+# ----------------------------------------------------
+# Locations CRUD (Administrative)
+# ----------------------------------------------------
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def manage_locations(request):
+    if request.method == 'GET':
+        locations = Location.objects.all().order_by('nome')
+        serializer = LocationSerializer(locations, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        serializer = LocationSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def location_detail(request, pk):
+    try:
+        location = Location.objects.get(pk=pk)
+    except Location.DoesNotExist:
+        return Response({'error': 'Localização não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = LocationSerializer(location)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        serializer = LocationSerializer(location, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    elif request.method == 'DELETE':
+        location.delete()
+        return Response({'success': 'Localização removida com sucesso.'}, status=status.HTTP_200_OK)
+
+# ----------------------------------------------------
+# Carrier Registration & Approvals (Multi-step Flow)
+# ----------------------------------------------------
+from django.contrib.auth.hashers import make_password
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_carrier(request):
+    data = request.data
+    nome = data.get('nome')
+    nif = data.get('nif')
+    email = data.get('email')
+    telefone = data.get('telefone')
+    endereco = data.get('endereco', '')
+    provincia = data.get('provincia', '')
+    municipio = data.get('municipio', '')
+    tipo_empresa = data.get('tipo_empresa', 'Lda')
+    ano_fundacao = data.get('ano_fundacao')
+    
+    resp_nome = data.get('resp_nome')
+    resp_cargo = data.get('resp_cargo', 'Gerente')
+    resp_doc = data.get('resp_doc', '')
+    resp_telefone = data.get('resp_telefone', '')
+    resp_email = data.get('resp_email')
+    resp_password = data.get('resp_password')
+
+    if not nome or not nif or not email or not resp_email or not resp_password:
+        return Response({'error': 'Preencha os campos obrigatórios da empresa e do responsável.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if Company.objects.filter(nif=nif).exists():
+        return Response({'error': 'Já existe uma empresa registada com este NIF.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if User.objects.filter(username=resp_email).exists():
+        return Response({'error': 'Este email de responsável já está registado no sistema.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # 1. Create Company (PENDENTE)
+    company = Company.objects.create(
+        nome=nome,
+        nif=nif,
+        email=email,
+        telefone=telefone,
+        endereco=endereco,
+        provincia=provincia,
+        municipio=municipio,
+        tipo_empresa=tipo_empresa,
+        ano_fundacao=int(ano_fundacao) if ano_fundacao else None,
+        status='PENDENTE',
+        code=nome.replace(" ", "").upper()[:8]
+    )
+
+    # 2. Create Django Auth User & UserProfile
+    user = User.objects.create_user(
+        username=resp_email,
+        email=resp_email,
+        password=resp_password,
+        first_name=resp_nome.split(' ')[0],
+        last_name=resp_nome.split(' ')[1] if ' ' in resp_nome else ''
+    )
+    
+    UserProfile.objects.create(
+        user=user,
+        nome=resp_nome,
+        email=resp_email,
+        telefone=resp_telefone,
+        document=resp_doc,
+        role='OPERADOR',
+        company=company
+    )
+
+    # 3. Create CompanyAdmin record
+    CompanyAdmin.objects.create(
+        company=company,
+        nome=resp_nome,
+        email=resp_email,
+        telefone=resp_telefone,
+        password=make_password(resp_password),
+        cargo=resp_cargo,
+        documento_identificacao=resp_doc
+    )
+
+    # Create notifications for all admin users in the database
+    admins = UserProfile.objects.filter(role='ADMIN')
+    for admin_profile in admins:
+        Notification.objects.create(
+            user=admin_profile.user,
+            tipo='CONFIRMACAO',
+            mensagem=f"Nova candidatura: A transportadora '{company.nome}' (NIF: {company.nif}) registou-se no sistema e aguarda validação.",
+            enviado=True
+        )
+
+    # Create confirmation notification for the registered operator
+    Notification.objects.create(
+        user=user,
+        tipo='CONFIRMACAO',
+        mensagem=f"Candidatura submetida: O registo da sua transportadora '{company.nome}' foi recebido e aguarda validação administrativa.",
+        enviado=True
+    )
+
+    # 4. Generate simulated 6-digit OTP code
+    otp_code = str(random.randint(100000, 999999))
+
+    # Send actual email to the operator with registration confirmation and OTP code
+    try:
+        subject = "Candidatura Nzila - Código de Verificação"
+        message = (
+            f"Olá {resp_nome},\n\n"
+            f"A candidatura da sua transportadora '{company.nome}' foi registada com sucesso no sistema Nzila.\n"
+            f"Para concluir a verificação de segurança, insira o seguinte código no formulário de registo:\n\n"
+            f"Código OTP: {otp_code}\n\n"
+            f"Após a verificação, a sua documentação será analisada pelos nossos administradores.\n\n"
+            f"Melhores cumprimentos,\n"
+            f"Equipa Nzila"
+        )
+        from_email = settings.DEFAULT_FROM_EMAIL
+        send_mail(subject, message, from_email, [resp_email], fail_silently=False)
+    except Exception as e:
+        print(f"Erro ao enviar e-mail de confirmação: {e}")
+
+    return Response({
+        'success': 'Registo da transportadora criado. Conclua a verificação OTP.',
+        'company_id': company.id,
+        'otp': otp_code
+    }, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_carrier_otp(request):
+    otp = request.data.get('otp')
+    if not otp:
+        return Response({'error': 'Introduza o código OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # In simulation, accept any OTP if it is 6 digits
+    if len(str(otp)) == 6:
+        return Response({'success': 'Contacto verificado com sucesso.'}, status=status.HTTP_200_OK)
+    return Response({'error': 'Código OTP inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def upload_carrier_document(request):
+    data = request.data
+    company_id = data.get('company_id')
+    tipo = data.get('tipo')
+    arquivo_url = data.get('arquivo_url')
+
+    if not company_id or not tipo or not arquivo_url:
+        return Response({'error': 'Dados em falta para envio do documento.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        company = Company.objects.get(pk=company_id)
+    except Company.DoesNotExist:
+        return Response({'error': 'Transportadora não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    doc = CompanyDocument.objects.create(
+        company=company,
+        tipo=tipo,
+        arquivo_url=arquivo_url,
+        aprovado=False
+    )
+    
+    serializer = CompanyDocumentSerializer(doc)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def admin_review_carrier(request):
+    data = request.data
+    company_id = data.get('company_id')
+    status_choice = data.get('status')
+    motivo = data.get('motivo_rejeicao', '')
+
+    if not company_id or not status_choice:
+        return Response({'error': 'Indique a transportadora e o estado pretendido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if status_choice not in ['APROVADA', 'REJEITADA', 'SUSPENSA']:
+        return Response({'error': 'Estado inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        company = Company.objects.get(pk=company_id)
+    except Company.DoesNotExist:
+        return Response({'error': 'Transportadora não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    company.status = status_choice
+    company.motivo_rejeicao = motivo
+    company.save()
+
+    # Create notifications for operators associated with the company
+    profiles = company.profiles.all()
+    for profile in profiles:
+        Notification.objects.create(
+            user=profile.user,
+            tipo='CONFIRMACAO' if status_choice == 'APROVADA' else 'CANCELAMENTO',
+            mensagem=f"A sua transportadora '{company.nome}' foi {status_choice.lower()} pelo administrador. Motivo: {motivo if motivo else 'Sem observações.'}",
+            enviado=True
+        )
+
+        # Send actual email to the operator indicating status review
+        try:
+            subject = f"Candidatura Nzila - Transportadora {status_choice.capitalize()}"
+            message = (
+                f"Olá {profile.nome},\n\n"
+                f"A sua candidatura/conta para a transportadora '{company.nome}' foi avaliada pelo administrador.\n"
+                f"O estado atual da sua empresa é: {status_choice}.\n"
+                f"Motivo / Observações: {motivo if motivo else 'Sem observações adicionais.'}\n\n"
+                f"Se a candidatura foi APROVADA, já pode fazer login na sua conta para configurar as suas frotas, rotas e viagens.\n\n"
+                f"Melhores cumprimentos,\n"
+                f"Equipa Nzila"
+            )
+            from_email = settings.DEFAULT_FROM_EMAIL
+            send_mail(subject, message, from_email, [profile.email], fail_silently=False)
+        except Exception as e:
+            print(f"Erro ao enviar e-mail de revisão da transportadora: {e}")
+
+    # Approve all documents if company is approved
+    if status_choice == 'APROVADA':
+        company.documents.all().update(aprovado=True)
+
+    return Response({'success': f"Estado da transportadora alterado para {status_choice}."}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def admin_list_carriers(request):
+    companies = Company.objects.all().order_by('-created_at')
+    
+    result = []
+    for c in companies:
+        c_data = CompanySerializer(c).data
+        c_data['documents'] = CompanyDocumentSerializer(c.documents.all(), many=True).data
+        c_data['admins'] = CompanyAdminSerializer(c.admins.all(), many=True).data
+        result.append(c_data)
+        
+    return Response(result, status=status.HTTP_200_OK)
+
+# ----------------------------------------------------
+# Carrier Operations Management (Buses, Routes, Trips)
+# ----------------------------------------------------
+
+@api_view(['GET', 'PUT'])
+@permission_classes([AllowAny])
+def carrier_info(request):
+    company_id = request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+        
+    if not company_id:
+        return Response({'error': 'Identificação da transportadora em falta.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    try:
+        company = Company.objects.get(pk=company_id)
+    except Company.DoesNotExist:
+        return Response({'error': 'Transportadora não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == 'GET':
+        serializer = CompanySerializer(company)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    elif request.method == 'PUT':
+        data = request.data
+        company.descricao = data.get('descricao', company.descricao)
+        company.politica_cancelamento = data.get('politica_cancelamento', company.politica_cancelamento)
+        company.save()
+        serializer = CompanySerializer(company)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def carrier_manage_buses(request, pk=None):
+    company_id = request.data.get('company_id') or request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+
+    if request.method == 'GET':
+        if not company_id:
+            buses = Bus.objects.all()
+        else:
+            buses = Bus.objects.filter(empresa_id=company_id)
+        serializer = BusSerializer(buses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if not company_id:
+        return Response({'error': 'Identificação da transportadora em falta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == 'POST':
+        modelo = request.data.get('modelo')
+        capacidade = request.data.get('capacidade')
+        
+        if not modelo or not capacidade:
+            return Response({'error': 'Preencha o modelo e capacidade do autocarro.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        bus = Bus.objects.create(
+            empresa_id=company_id,
+            modelo=modelo,
+            capacidade=int(capacidade)
+        )
+        
+        seats_to_create = []
+        for i in range(1, bus.capacidade + 1):
+            seat_num = f"{(i-1)//4 + 1:02d}"
+            seat_letter = chr(65 + ((i - 1) % 4))
+            seats_to_create.append(Seat(bus=bus, numero=f"{seat_num}{seat_letter}"))
+        Seat.objects.bulk_create(seats_to_create)
+        
+        serializer = BusSerializer(bus)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    elif request.method == 'PUT':
+        try:
+            bus = Bus.objects.get(pk=pk, empresa_id=company_id)
+        except Bus.DoesNotExist:
+            return Response({'error': 'Autocarro não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        bus.modelo = request.data.get('modelo', bus.modelo)
+        capacidade = request.data.get('capacidade')
+        if capacidade and int(capacidade) != bus.capacidade:
+            bus.capacidade = int(capacidade)
+            bus.seats.all().delete()
+            seats_to_create = []
+            for i in range(1, bus.capacidade + 1):
+                seat_num = f"{(i-1)//4 + 1:02d}"
+                seat_letter = chr(65 + ((i - 1) % 4))
+                seats_to_create.append(Seat(bus=bus, numero=f"{seat_num}{seat_letter}"))
+            Seat.objects.bulk_create(seats_to_create)
+            
+        bus.save()
+        serializer = BusSerializer(bus)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'DELETE':
+        try:
+            bus = Bus.objects.get(pk=pk, empresa_id=company_id)
+        except Bus.DoesNotExist:
+            return Response({'error': 'Autocarro não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if bus.trips.filter(status='ATIVA').exists():
+            return Response({'error': 'Não pode eliminar um autocarro com viagens ativas vinculadas.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        bus.delete()
+        return Response({'success': 'Autocarro removido com sucesso.'}, status=status.HTTP_200_OK)
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def carrier_manage_routes(request, pk=None):
+    if request.method == 'GET':
+        routes = Route.objects.all().order_by('origem__nome')
+        serializer = RouteSerializer(routes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'POST':
+        origem_id = request.data.get('origem_id')
+        destino_id = request.data.get('destino_id')
+        distancia = request.data.get('distancia_km')
+        duracao = request.data.get('duracao_estimada')
+
+        if not origem_id or not destino_id or not distancia or not duracao:
+            return Response({'error': 'Preencha todos os campos da rota.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if str(origem_id) == str(destino_id):
+            return Response({'error': 'A origem e o destino da rota devem ser diferentes.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if Route.objects.filter(origem_id=origem_id, destino_id=destino_id).exists():
+            return Response({'error': 'Esta rota já se encontra registada.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        h, m = map(int, duracao.split(':'))
+        route = Route.objects.create(
+            origem_id=origem_id,
+            destino_id=destino_id,
+            distancia_km=float(distancia),
+            duracao_estimada=datetime.time(h, m)
+        )
+        serializer = RouteSerializer(route)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    elif request.method == 'PUT':
+        try:
+            route = Route.objects.get(pk=pk)
+        except Route.DoesNotExist:
+            return Response({'error': 'Rota não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        distancia = request.data.get('distancia_km')
+        duracao = request.data.get('duracao_estimada')
+
+        if distancia:
+            route.distancia_km = float(distancia)
+        if duracao:
+            h, m = map(int, duracao.split(':'))
+            route.duracao_estimada = datetime.time(h, m)
+        
+        route.save()
+        serializer = RouteSerializer(route)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'DELETE':
+        try:
+            route = Route.objects.get(pk=pk)
+        except Route.DoesNotExist:
+            return Response({'error': 'Rota não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        route.delete()
+        return Response({'success': 'Rota removida com sucesso.'}, status=status.HTTP_200_OK)
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def carrier_manage_trips(request, pk=None):
+    company_id = request.data.get('company_id') or request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+
+    if request.method == 'GET':
+        if not company_id:
+            trips = Trip.objects.all().order_by('-data_saida', '-hora_saida')
+        else:
+            trips = Trip.objects.filter(empresa_id=company_id).order_by('-data_saida', '-hora_saida')
+        serializer = TripSerializer(trips, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if not company_id:
+        return Response({'error': 'Identificação da transportadora em falta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == 'POST':
+        route_id = request.data.get('route_id')
+        bus_id = request.data.get('bus_id')
+        data_saida_str = request.data.get('data_saida')
+        hora_saida_str = request.data.get('hora_saida')
+        hora_chegada_str = request.data.get('hora_chegada')
+        preco_ida = request.data.get('preco_ida')
+        preco_ida_volta = request.data.get('preco_ida_volta')
+        classe = request.data.get('classe')
+
+        if not bus_id:
+            return Response({'error': 'Não é permitido criar viagens sem associar um autocarro.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not route_id or not data_saida_str or not hora_saida_str or not hora_chegada_str or not preco_ida or not classe:
+            return Response({'error': 'Preencha todos os campos obrigatórios da viagem.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            bus = Bus.objects.get(pk=bus_id, empresa_id=company_id)
+        except Bus.DoesNotExist:
+            return Response({'error': 'O autocarro selecionado não pertence a esta transportadora.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        data_saida = datetime.datetime.strptime(data_saida_str, '%Y-%m-%d').date()
+        hs = datetime.datetime.strptime(hora_saida_str, '%H:%M').time()
+        hc = datetime.datetime.strptime(hora_chegada_str, '%H:%M').time()
+
+        if Trip.objects.filter(bus=bus, data_saida=data_saida, hora_saida=hs, status='ATIVA').exists():
+            return Response({'error': 'Este autocarro já se encontra escalado para outra viagem nesta mesma hora.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        trip = Trip.objects.create(
+            empresa_id=company_id,
+            route_id=route_id,
+            bus=bus,
+            data_saida=data_saida,
+            hora_saida=hs,
+            hora_chegada=hc,
+            preco_ida=float(preco_ida),
+            preco_ida_volta=float(preco_ida_volta) if preco_ida_volta else None,
+            classe=classe.upper(),
+            status='ATIVA'
+        )
+
+        serializer = TripSerializer(trip)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    elif request.method == 'PUT':
+        try:
+            trip = Trip.objects.get(pk=pk, empresa_id=company_id)
+        except Trip.DoesNotExist:
+            return Response({'error': 'Viagem não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        preco_ida = request.data.get('preco_ida')
+        preco_ida_volta = request.data.get('preco_ida_volta')
+        trip_status = request.data.get('status')
+
+        if preco_ida:
+            trip.preco_ida = float(preco_ida)
+        if preco_ida_volta:
+            trip.preco_ida_volta = float(preco_ida_volta)
+        if trip_status:
+            if trip_status.upper() in ['ATIVA', 'CANCELADA']:
+                trip.status = trip_status.upper()
+                
+                if trip_status.upper() == 'CANCELADA':
+                    active_res = trip.reservations.filter(status='CONFIRMADA')
+                    for res in active_res:
+                        res.status = 'CANCELADA'
+                        res.save()
+                        Notification.objects.create(
+                            user=res.user,
+                            tipo='CANCELAMENTO',
+                            mensagem=f"A sua viagem da reserva '{res.codigo_reserva}' foi cancelada pela transportadora. O reembolso será processado.",
+                            enviado=True
+                        )
+                        
+        trip.save()
+        serializer = TripSerializer(trip)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'DELETE':
+        try:
+            trip = Trip.objects.get(pk=pk, empresa_id=company_id)
+        except Trip.DoesNotExist:
+            return Response({'error': 'Viagem não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if trip.reservations.exists():
+            return Response({'error': 'Não pode apagar viagens com reservas efetuadas. Cancele-a em vez disso.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        trip.delete()
+        return Response({'success': 'Viagem eliminada com sucesso.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_notifications(request):
+    user_email = request.query_params.get('email')
+    
+    if request.user.is_authenticated:
+        notifications = Notification.objects.filter(user=request.user)
+    elif user_email:
+        try:
+            user = User.objects.get(email=user_email)
+            notifications = Notification.objects.filter(user=user)
+        except User.DoesNotExist:
+            return Response([], status=status.HTTP_200_OK)
+    else:
+        return Response({'error': 'Falta identificação do utilizador (autenticação ou email).'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    notifications = notifications.order_by('-created_at')
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def resend_carrier_otp(request):
+    email = request.data.get('email')
+    if not email:
+        return Response({'error': 'Indique o email do responsável.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    try:
+        admin = CompanyAdmin.objects.get(email=email)
+        company = admin.company
+    except CompanyAdmin.DoesNotExist:
+        return Response({'error': 'Responsável não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+    otp_code = str(random.randint(100000, 999999))
+    
+    try:
+        subject = "Candidatura Nzila - Reenvio de Código de Verificação"
+        message = (
+            f"Olá {admin.nome},\n\n"
+            f"Conforme solicitado, reenviamos o seu código de verificação para a transportadora '{company.nome}'.\n\n"
+            f"Novo Código OTP: {otp_code}\n\n"
+            f"Insira este código no formulário para concluir a validação.\n\n"
+            f"Melhores cumprimentos,\n"
+            f"Equipa Nzila"
+        )
+        from_email = settings.DEFAULT_FROM_EMAIL
+        send_mail(subject, message, from_email, [email], fail_silently=False)
+    except Exception as e:
+        print(f"Erro ao reenviar e-mail de confirmação: {e}")
+        
+    return Response({
+        'success': 'Código OTP reenviado com sucesso.',
+        'otp': otp_code
+    }, status=status.HTTP_200_OK)
+
+
+

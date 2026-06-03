@@ -1,13 +1,13 @@
 import React from 'react';
 import type { Metadata, Viewport } from 'next';
-import { DM_Sans } from 'next/font/google';
+import { Nunito_Sans } from 'next/font/google';
 // import '../styles/tailwind.css';
 import { Toaster } from 'sonner';
 
-const dmSans = DM_Sans({
+const nunitoSans = Nunito_Sans({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-dm-sans',
+  weight: ['400', '600', '700', '800'],
+  variable: '--font-nunito-sans',
   display: 'swap',
 });
 
@@ -27,11 +27,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt" className={dmSans.variable}>
+    <html lang="pt" className={nunitoSans.variable}>
       <head>
         <link rel="stylesheet" href="/tailwind.css" />
       </head>
-      <body className={dmSans.className}>
+      <body className={nunitoSans.className}>
         {children}
         <Toaster position="bottom-right" richColors closeButton />
 

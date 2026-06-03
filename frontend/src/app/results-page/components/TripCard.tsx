@@ -46,8 +46,15 @@ export default function TripCard({ trip }: TripCardProps) {
   const seatsUrgent = trip.availableSeats <= 5;
 
   const handleSelect = () => {
-    // Backend integration point: navigate to seat selection with trip ID
-    router.push(`/sign-up-login-screen?trip=${trip.id}`);
+    // If the user is already logged in, skip the login screen
+    const stored = typeof window !== 'undefined'
+      ? localStorage.getItem('nzila_current_user')
+      : null;
+    if (stored) {
+      router.push(`/payment?trip=${trip.id}`);
+    } else {
+      router.push(`/sign-up-login-screen?trip=${trip.id}`);
+    }
   };
 
   return (

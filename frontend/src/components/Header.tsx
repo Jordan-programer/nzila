@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import { Menu, X, User, LogIn } from 'lucide-react';
+import { Menu, X, User, LogIn, Bell, ArrowRight } from 'lucide-react';
 
 const navLinks = [
   { label: 'Início', href: '/', key: 'nav-home' },
@@ -13,9 +13,27 @@ const navLinks = [
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState<{ name: string; email?: string; role?: string } | null>(null);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  // Returns the link target if this notification is a carrier-registration notification for admin
+  const getNotifLink = (n: any): string | null => {
+    if (user?.role !== 'admin') return null;
+    const text = ((n.subject || '') + ' ' + (n.snippet || '')).toLowerCase();
+    if (
+      text.includes('transportadora') ||
+      text.includes('candidatura') ||
+      text.includes('carrier') ||
+      text.includes('nova empresa')
+    ) {
+      return '/admin?tab=empresas';
+    }
+    return null;
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -30,12 +48,71 @@ export default function Header() {
       }
     };
 
+    const fetchNotifs = async () => {
+      const storedUser = localStorage.getItem('nzila_current_user');
+      let userEmail = '';
+      if (storedUser) {
+        try {
+          userEmail = JSON.parse(storedUser).email || '';
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      let localNotifs: any[] = [];
+      const storedLocal = localStorage.getItem('nzila_simulated_emails');
+      if (storedLocal) {
+        try {
+          localNotifs = JSON.parse(storedLocal);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      if (userEmail) {
+        try {
+          const res = await fetch(
+            `http://localhost:8000/api/notifications/?email=${encodeURIComponent(userEmail)}`
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const backendNotifs = data.map((item: any) => ({
+              id: `db-${item.id}`,
+              recipient: userEmail,
+              subject:
+                item.tipo === 'CONFIRMACAO'
+                  ? 'Nzila: Confirmação / Registo'
+                  : item.tipo === 'LEMBRETE'
+                    ? 'Nzila: Lembrete'
+                    : 'Nzila: Alerta / Cancelamento',
+              snippet: item.mensagem,
+              sentAt: item.created_at,
+            }));
+
+            const combined = [...backendNotifs, ...localNotifs];
+            const unique = combined.filter(
+              (notif, idx, self) => self.findIndex((n) => n.snippet === notif.snippet) === idx
+            );
+            setNotifications(unique);
+            return;
+          }
+        } catch (error) {
+          console.warn('Backend notifications endpoint unreachable, using local fallback:', error);
+        }
+      }
+
+      setNotifications(localNotifs);
+    };
+
     checkUser();
+    fetchNotifs();
     window.addEventListener('storage', checkUser);
+    window.addEventListener('storage', fetchNotifs);
 
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('storage', checkUser);
+      window.removeEventListener('storage', fetchNotifs);
     };
   }, []);
 
@@ -45,6 +122,10 @@ export default function Header() {
     window.dispatchEvent(new Event('storage'));
     window.location.href = '/';
   };
+
+  const userNotifs = notifications.filter(
+    (n) => n.recipient?.toLowerCase() === user?.email?.toLowerCase()
+  );
 
   return (
     <header
@@ -89,6 +170,21 @@ export default function Header() {
               </>
             )}
 
+            {(user?.role?.toLowerCase() === 'operador' ||
+              user?.role?.toLowerCase() === 'operator') && (
+              <>
+                <span className="h-4 w-px bg-border mx-2" />
+                <Link
+                  href="/operator"
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-150 ${
+                    pathname.startsWith('/operator') ? 'text-primary bg-primary/5' : ''
+                  }`}
+                >
+                  Painel Operador
+                </Link>
+              </>
+            )}
+
             {user?.role === 'fiscal' && (
               <>
                 <span className="h-4 w-px bg-border mx-2" />
@@ -116,6 +212,85 @@ export default function Header() {
           <div className="hidden lg:flex items-center gap-2">
             {user ? (
               <div className="flex items-center gap-3">
+                {/* Desktop Notification Bell */}
+                <div className="relative">
+                  <button
+                    onClick={() => setIsNotifOpen(!isNotifOpen)}
+                    className="p-2 text-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors relative"
+                    title="Notificações"
+                  >
+                    <Bell size={18} />
+                    {userNotifs.length > 0 && (
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full" />
+                    )}
+                  </button>
+
+                  {isNotifOpen && (
+                    <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3 text-xs animate-bounce-in font-sans">
+                      <div className="flex justify-between items-center border-b border-border pb-2">
+                        <span className="font-bold text-foreground">Notificações Nzila</span>
+                        <button
+                          onClick={() => setIsNotifOpen(false)}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      {userNotifs.length === 0 ? (
+                        <div className="text-center py-4 text-muted-foreground">
+                          Sem novas notificações.
+                        </div>
+                      ) : (
+                      <div className="max-h-60 overflow-y-auto space-y-2">
+                          {userNotifs.map((n) => {
+                            const link = getNotifLink(n);
+                            const isClickable = !!link;
+                            const content = (
+                              <>
+                                <span className="block font-bold text-foreground text-[11px]">
+                                  {n.subject}
+                                </span>
+                                <p className="text-muted-foreground text-[10px] leading-relaxed">
+                                  {n.snippet}
+                                </p>
+                                {isClickable && (
+                                  <span className="flex items-center gap-0.5 text-[9px] text-primary font-bold mt-0.5">
+                                    Ver transportadoras pendentes
+                                    <ArrowRight size={9} />
+                                  </span>
+                                )}
+                                <span className="block text-[8px] text-muted-foreground/60 text-right">
+                                  {new Date(n.sentAt).toLocaleTimeString('pt-AO', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              </>
+                            );
+                            return isClickable ? (
+                              <button
+                                key={n.id}
+                                type="button"
+                                onClick={() => { setIsNotifOpen(false); router.push(link); }}
+                                className="w-full p-2 hover:bg-primary/5 rounded-xl space-y-1 transition-all border border-primary/20 bg-primary/5 text-left cursor-pointer"
+                              >
+                                {content}
+                              </button>
+                            ) : (
+                              <div
+                                key={n.id}
+                                className="p-2 hover:bg-muted/40 rounded-xl space-y-1 transition-all border border-border/40 text-left"
+                              >
+                                {content}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <Link
                   href="/client"
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-150 ${
@@ -154,14 +329,95 @@ export default function Header() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="lg:hidden p-2 rounded-lg text-foreground hover:bg-muted transition-colors duration-150"
-            aria-label="Abrir menu"
-          >
-            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          </button>
+          {/* Mobile actions & Menu Button */}
+          <div className="flex items-center gap-2 lg:hidden">
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={() => setIsNotifOpen(!isNotifOpen)}
+                  className="p-2 text-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors relative"
+                  title="Notificações"
+                >
+                  <Bell size={18} />
+                  {userNotifs.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full" />
+                  )}
+                </button>
+
+                {isNotifOpen && (
+                  <div className="absolute right-[-40px] mt-2 w-72 bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3 text-xs animate-bounce-in font-sans">
+                    <div className="flex justify-between items-center border-b border-border pb-2">
+                      <span className="font-bold text-foreground">Notificações Nzila</span>
+                      <button
+                        onClick={() => setIsNotifOpen(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                    {userNotifs.length === 0 ? (
+                      <div className="text-center py-4 text-muted-foreground">
+                        Sem novas notificações.
+                      </div>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto space-y-2">
+                        {userNotifs.map((n) => {
+                          const link = getNotifLink(n);
+                          const isClickable = !!link;
+                          const content = (
+                            <>
+                              <span className="block font-bold text-foreground text-[10px]">
+                                {n.subject}
+                              </span>
+                              <p className="text-muted-foreground text-[9px] leading-relaxed">
+                                {n.snippet}
+                              </p>
+                              {isClickable && (
+                                <span className="flex items-center gap-0.5 text-[8px] text-primary font-bold mt-0.5">
+                                  Ver transportadoras pendentes
+                                  <ArrowRight size={8} />
+                                </span>
+                              )}
+                              <span className="block text-[8px] text-muted-foreground/60 text-right">
+                                {new Date(n.sentAt).toLocaleTimeString('pt-AO', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </>
+                          );
+                          return isClickable ? (
+                            <button
+                              key={n.id}
+                              type="button"
+                              onClick={() => { setIsNotifOpen(false); router.push(link); }}
+                              className="w-full p-2 hover:bg-primary/5 rounded-xl space-y-1 transition-all border border-primary/20 bg-primary/5 text-left cursor-pointer"
+                            >
+                              {content}
+                            </button>
+                          ) : (
+                            <div
+                              key={n.id}
+                              className="p-2 hover:bg-muted/40 rounded-xl space-y-1 transition-all border border-border/40 text-left"
+                            >
+                              {content}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="p-2 rounded-lg text-foreground hover:bg-muted transition-colors duration-150"
+              aria-label="Abrir menu"
+            >
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -195,6 +451,19 @@ export default function Header() {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold uppercase text-muted-foreground hover:text-primary hover:bg-primary/5"
               >
                 Painel Admin
+              </Link>
+            </div>
+          )}
+
+          {(user?.role?.toLowerCase() === 'operador' ||
+            user?.role?.toLowerCase() === 'operator') && (
+            <div className="pt-2 border-t border-border flex flex-col gap-1.5">
+              <Link
+                href="/operator"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold uppercase text-muted-foreground hover:text-primary hover:bg-primary/5"
+              >
+                Painel Operador
               </Link>
             </div>
           )}
