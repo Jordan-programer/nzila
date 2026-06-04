@@ -85,7 +85,7 @@
   }
 
   .card-hover:hover {
-    box-shadow: 0 8px 32px rgba(13, 110, 253, 0.12);
+    box-shadow: 0 8px 32px rgba(5, 150, 105, 0.12);
     transform: translateY(-2px);
   }
 
@@ -98,7 +98,7 @@
   }
 
   .trip-card-shadow:hover {
-    box-shadow: 0 6px 24px rgba(13, 110, 253, 0.14);
+    box-shadow: 0 6px 24px rgba(5, 150, 105, 0.12);
   }
 
   .seat-available {
@@ -253,5 +253,70 @@
       opacity: 1;
       transform: scale(1);
     }
+  }
+}
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  /* Collapse non-printable elements completely to prevent blank pages */
+  .no-print,
+  .no-print * {
+    display: none !important;
+  }
+
+  /* Hide other elements by default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Reset main layouts and paddings for clean printing */
+  main,
+  main > div {
+    padding: 0 !important;
+    margin: 0 auto !important;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Show print overlay and ticket */
+  .print-overlay {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: flex-start !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    visibility: visible !important;
+  }
+
+  .printable-ticket,
+  .printable-ticket * {
+    visibility: visible !important;
+  }
+
+  .printable-ticket {
+    position: relative !important;
+    width: 100% !important;
+    max-width: 600px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
   }
 }

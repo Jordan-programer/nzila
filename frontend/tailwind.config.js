@@ -58,11 +58,11 @@ module.exports = {
         '2xl': 'calc(var(--radius) + 12px)',
       },
       fontFamily: {
-        sans: ['var(--font-dm-sans)', 'DM Sans', 'sans-serif'],
+        sans: ['var(--font-nunito-sans)', 'Nunito Sans', 'Segoe UI', 'sans-serif'],
       },
       boxShadow: {
         card: '0 2px 12px rgba(0,0,0,0.06)',
-        'card-hover': '0 6px 24px rgba(13,110,253,0.14)',
+        'card-hover': '0 6px 24px rgba(5,150,105,0.12)',
         search: '0 20px 60px rgba(0,0,0,0.15)',
         modal: '0 24px 80px rgba(0,0,0,0.18)',
       },

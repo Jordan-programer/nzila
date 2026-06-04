@@ -430,7 +430,7 @@ function CheckoutContent() {
         </div>
       )}
 
-      <main className="flex-1 pt-24 pb-16">
+      <main className="flex-1 pt-24 pb-16" style={{ paddingBottom: '4rem' }}>
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           {/* Page Title */}
           <div className="mb-8">
@@ -922,7 +922,7 @@ function CheckoutContent() {
               </div>
 
               {/* Guarantees */}
-              <div className="bg-primary/5 border border-primary/25 rounded-2xl p-4 flex gap-3">
+              <div className="bg-primary/5 border border-primary/25 rounded-2xl p-4 flex gap-3 shadow-xs" style={{ marginTop: '24px' }}>
                 <ShieldCheck size={24} className="text-primary flex-shrink-0" />
                 <div>
                   <h4 className="text-xs font-bold text-primary mb-1">Compra 100% Protegida</h4>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { getReservations, updateReservationStatus, Reservation } from '@/app/components/mockDb';
+import { getReservations, updateReservationStatus, getCurrentUser, Reservation } from '@/app/components/mockDb';
 import { toast } from 'sonner';
 import {
   QrCode,
@@ -27,9 +27,10 @@ export default function TicketValidationPage() {
   // Scanned Ticket result
   const [scannedTicket, setScannedTicket] = useState<Reservation | null>(null);
   const [validationResult, setValidationResult] = useState<
-    'NONE' | 'VALID' | 'ALREADY_USED' | 'INVALID'
+    'NONE' | 'VALID' | 'ALREADY_USED' | 'INVALID' | 'WRONG_CARRIER'
   >('NONE');
   const [scanning, setScanning] = useState(false);
+  const [cameraSupported, setCameraSupported] = useState(true);
 
   const loadReservations = () => {
     setReservations(getReservations());
@@ -37,6 +38,50 @@ export default function TicketValidationPage() {
 
   useEffect(() => {
     loadReservations();
+
+    let scanner: any = null;
+    let isScanningActive = true;
+
+    const startScanner = async () => {
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        
+        scanner = new Html5Qrcode('qr-reader');
+        
+        await scanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: 220, height: 220 },
+          },
+          (decodedText: string) => {
+            if (!isScanningActive) return;
+            setInputCode(decodedText);
+            handleValidate(decodedText);
+          },
+          (error: any) => {
+            // Silence scanning errors
+          }
+        ).catch((err: any) => {
+          console.warn('Erro ao ligar a câmara:', err);
+          setCameraSupported(false);
+        });
+      } catch (err) {
+        console.warn('Erro ao iniciar o leitor QR físico:', err);
+        setCameraSupported(false);
+      }
+    };
+
+    startScanner();
+
+    return () => {
+      isScanningActive = false;
+      if (scanner) {
+        scanner.stop().catch((err: any) => {
+          console.warn('Erro ao parar câmara:', err);
+        });
+      }
+    };
   }, []);
 
   const handleValidate = (codeToValidate: string) => {
@@ -61,6 +106,17 @@ export default function TicketValidationPage() {
       }
 
       setScannedTicket(ticket);
+
+      // Verificar se o utilizador atual é um fiscal e se o bilhete pertence à sua transportadora
+      const currentUser = getCurrentUser();
+      if (currentUser && (currentUser.role === 'fiscal' || currentUser.role === 'FISCAL')) {
+        const fiscalCompany = currentUser.company_code || 'TRANSLUX'; // Default to TRANSLUX
+        if (ticket.carrierCode !== fiscalCompany) {
+          setValidationResult('WRONG_CARRIER');
+          toast.error(`Acesso Negado: Como fiscal da ${fiscalCompany}, não tem permissão para validar bilhetes da ${ticket.carrier || ticket.carrierCode}!`);
+          return;
+        }
+      }
 
       if (ticket.status === 'CANCELADO') {
         setValidationResult('INVALID');
@@ -140,8 +196,7 @@ export default function TicketValidationPage() {
                     </button>
                   </div>
                 </div>
-
-                {/* Simulated Scanner Viewport */}
+                {/* Real QR Scanner Viewport */}
                 <div className="border-t border-border pt-4">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xs font-black text-foreground uppercase tracking-wider">
@@ -149,60 +204,26 @@ export default function TicketValidationPage() {
                     </h3>
                     <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
                   </div>
-
-                  {/* Camera frame */}
+                  {/* Camera feed from html5-qrcode */}
                   <div className="aspect-square bg-slate-950 border border-slate-800 rounded-2xl relative overflow-hidden flex items-center justify-center">
-                    {scanning ? (
-                      <div className="text-center z-10 space-y-3">
-                        <Loader2 className="animate-spin text-primary w-8 h-8 mx-auto" />
-                        <span className="text-xs font-bold text-white tracking-widest block uppercase animate-pulse">
-                          A ler código...
+                    {cameraSupported ? (
+                      <>
+                        <div id="qr-reader" className="w-full h-full" />
+                        {/* Futuristic Laser Scanner Overlay */}
+                        <div className="absolute inset-x-0 h-0.5 bg-success shadow-lg shadow-success z-10 animate-laser pointer-events-none" />
+                      </>
+                    ) : (
+                      <div className="text-center z-10 p-4 space-y-2">
+                        <QrCode size={40} className="text-white/20 mx-auto" />
+                        <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider block">
+                          Câmara Indisponível (Sem SSL/HTTPS)
+                        </span>
+                        <span className="text-[9px] text-white/40 max-w-[220px] mx-auto block leading-normal font-medium">
+                          O navegador bloqueia a câmara em ligações HTTP simples. Use o simulador rápido abaixo.
                         </span>
                       </div>
-                    ) : (
-                      <>
-                        {/* Scanner Laser effect */}
-                        <div className="absolute inset-x-0 h-0.5 bg-success shadow-lg shadow-success z-10 animate-laser" />
-
-                        {/* Target frame overlay */}
-                        <div className="w-32 h-32 border-2 border-dashed border-white/40 rounded-xl relative flex items-center justify-center">
-                          <QrCode size={48} className="text-white/20" />
-                        </div>
-                        <span className="absolute bottom-4 text-[9px] text-white/40 font-bold uppercase tracking-wider">
-                          Mire o QR Code do Bilhete
-                        </span>
-                      </>
                     )}
                   </div>
-                </div>
-
-                {/* Quick Selection Dropdown for demo */}
-                <div className="border-t border-border pt-4">
-                  <label className="block text-xs font-black text-foreground uppercase tracking-wider mb-2">
-                    Simulador Leitura Rápida
-                  </label>
-                  <select
-                    onChange={(e) => {
-                      setInputCode(e.target.value);
-                      handleValidate(e.target.value);
-                    }}
-                    defaultValue=""
-                    className="w-full px-3 py-2.5 border border-input rounded-xl text-xs bg-background text-foreground focus:outline-none cursor-pointer"
-                  >
-                    <option value="" disabled>
-                      Escolha um Bilhete Emitido...
-                    </option>
-                    {reservations.map((res) => (
-                      <option key={res.id} value={res.id}>
-                        {res.passengerName.split(' ')[0]} - {res.origin}→{res.destination} (
-                        {res.status})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
-                    * Atalho para testar a validação instantaneamente sem ter de digitar os códigos
-                    de reserva.
-                  </p>
                 </div>
               </div>
             </div>
@@ -262,6 +283,15 @@ export default function TicketValidationPage() {
                     </div>
                   )}
 
+                  {validationResult === 'WRONG_CARRIER' && (
+                    <div className="bg-danger/15 border-b border-danger/20 p-4 text-center text-danger flex items-center justify-center gap-2">
+                      <AlertTriangle size={20} className="stroke-[2.5]" />
+                      <span className="font-extrabold text-sm tracking-wide uppercase">
+                        ⚠️ Outra Transportadora
+                      </span>
+                    </div>
+                  )}
+
                   {/* Ticket details */}
                   <div className="p-6 space-y-6 flex-1">
                     {/* Passenger Profile */}
@@ -314,6 +344,18 @@ export default function TicketValidationPage() {
                         <span className="text-foreground">{scannedTicket.carrier}</span>
                       </div>
                     </div>
+
+                    {/* Wrong carrier warning */}
+                    {validationResult === 'WRONG_CARRIER' && (
+                      <div className="p-3 bg-danger/5 border border-danger/25 rounded-xl flex gap-2">
+                        <AlertTriangle size={16} className="text-danger flex-shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-danger leading-relaxed font-semibold">
+                          Acesso Negado: Este bilhete pertence à operadora{' '}
+                          <strong className="underline">{scannedTicket.carrier}</strong>.<br />
+                          Como fiscal da <strong className="underline">{getCurrentUser()?.company_code || 'TRANSLUX'}</strong>, apenas tem autorização para confirmar embarques da sua própria transportadora.
+                        </p>
+                      </div>
+                    )}
 
                     {/* Already used timestamps warning */}
                     {validationResult === 'ALREADY_USED' && scannedTicket.validationDate && (

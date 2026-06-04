@@ -189,12 +189,14 @@ export default function ClientDashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background relative">
-      <Header />
+      <div className="no-print">
+        <Header />
+      </div>
 
       {/* Ticket Modal Overlay */}
       {selectedTicket && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="w-full max-w-xl bg-card border border-border rounded-3xl overflow-hidden shadow-2xl animate-bounce-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in print-overlay">
+          <div className="w-full max-w-xl bg-card border border-border rounded-3xl overflow-hidden shadow-2xl animate-bounce-in printable-ticket">
             {/* Header */}
             <div
               className={`p-4 ${selectedTicket.carrierColor} text-white flex items-center justify-between`}
@@ -207,7 +209,7 @@ export default function ClientDashboardPage() {
               </div>
               <button
                 onClick={() => setSelectedTicket(null)}
-                className="p-1 rounded-lg hover:bg-white/10 text-white transition-colors"
+                className="p-1 rounded-lg hover:bg-white/10 text-white transition-colors no-print"
               >
                 <X size={18} />
               </button>
@@ -268,30 +270,37 @@ export default function ClientDashboardPage() {
                 </div>
               </div>
 
+              {/* Detalhes do Pagamento */}
+              <div className="border-t border-border pt-4 mt-4 grid grid-cols-2 gap-4 text-xs font-semibold">
+                <div>
+                  <span className="block text-[9px] text-muted-foreground font-black uppercase mb-0.5">
+                    Valor Pago
+                  </span>
+                  <span className="text-emerald-600 font-bold text-sm">
+                    {selectedTicket.price.toLocaleString('pt-AO')} Kz
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[9px] text-muted-foreground font-black uppercase mb-0.5">
+                    Método de Pagamento
+                  </span>
+                  <span className="text-foreground">
+                    {selectedTicket.paymentMethod || 'Multicaixa Express'}
+                  </span>
+                </div>
+              </div>
+
               {/* QR Code and actions */}
               <div className="flex flex-col items-center justify-center p-4 bg-muted/40 border border-border rounded-2xl">
-                {/* Standard Mock QR code */}
+                {/* Real Dynamic QR code */}
                 <div className="p-2.5 bg-white border border-border rounded-xl">
-                  <svg
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(selectedTicket.id)}`}
+                    alt={`QR Code para a reserva ${selectedTicket.id}`}
                     width="120"
                     height="120"
-                    viewBox="0 0 29 29"
-                    className="text-foreground fill-current"
-                  >
-                    <rect x="0" y="0" width="7" height="7" />
-                    <rect x="1" y="1" width="5" height="5" fill="#FFF" />
-                    <rect x="2" y="2" width="3" height="3" />
-                    <rect x="22" y="0" width="7" height="7" />
-                    <rect x="23" y="1" width="5" height="5" fill="#FFF" />
-                    <rect x="24" y="2" width="3" height="3" />
-                    <rect x="0" y="22" width="7" height="7" />
-                    <rect x="1" y="23" width="5" height="5" fill="#FFF" />
-                    <rect x="2" y="24" width="3" height="3" />
-                    <rect x="9" y="2" width="4" height="2" />
-                    <rect x="15" y="4" width="2" height="4" />
-                    <rect x="10" y="12" width="6" height="2" />
-                    <rect x="18" y="18" width="4" height="4" />
-                  </svg>
+                    className="text-foreground rounded-lg border border-border bg-white p-1"
+                  />
                 </div>
                 <span className="text-[10px] text-muted-foreground font-black tracking-widest uppercase mt-3">
                   Código de Validação Único
@@ -299,7 +308,7 @@ export default function ClientDashboardPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-muted border-t border-border flex justify-end gap-2">
+            <div className="px-6 py-4 bg-muted border-t border-border flex justify-end gap-2 no-print">
               <button
                 onClick={() => {
                   setSelectedTicket(null);
@@ -470,7 +479,7 @@ export default function ClientDashboardPage() {
       )}
 
       {/* Main Content Dashboard */}
-      <main className="flex-1 pt-24 pb-16">
+      <main className="flex-1 pt-24 pb-16 no-print" style={{ paddingBottom: '4rem' }}>
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             {/* Sidebar Menu */}
@@ -840,7 +849,9 @@ export default function ClientDashboardPage() {
         </div>
       </main>
 
-      <Footer />
+      <div className="no-print">
+        <Footer />
+      </div>
     </div>
   );
 }

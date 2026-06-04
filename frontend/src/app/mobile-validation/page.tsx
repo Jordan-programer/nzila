@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { getReservations, updateReservationStatus, Reservation } from '@/app/components/mockDb';
+import { getReservations, updateReservationStatus, getCurrentUser, Reservation } from '@/app/components/mockDb';
 import { toast } from 'sonner';
 import {
   QrCode,
@@ -46,8 +46,9 @@ export default function MobileValidationApp() {
 
   // Validation result overlay
   const [resultTicket, setResultTicket] = useState<Reservation | null>(null);
-  const [resultStatus, setResultStatus] = useState<'NONE' | 'VALID' | 'USED' | 'INVALID'>('NONE');
+  const [resultStatus, setResultStatus] = useState<'NONE' | 'VALID' | 'USED' | 'INVALID' | 'WRONG_CARRIER'>('NONE');
   const [syncing, setSyncing] = useState(false);
+  const [cameraSupported, setCameraSupported] = useState(true);
 
   const loadReservations = () => {
     setReservations(getReservations());
@@ -72,6 +73,49 @@ export default function MobileValidationApp() {
         status: 'SUCESSO',
       },
     ]);
+
+    let scanner: any = null;
+    let isScanningActive = true;
+
+    const startScanner = async () => {
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        
+        scanner = new Html5Qrcode('qr-reader-mobile');
+        
+        await scanner.start(
+          { facingMode: 'environment' },
+          {
+            fps: 10,
+            qrbox: { width: 150, height: 150 },
+          },
+          (decodedText: string) => {
+            if (!isScanningActive) return;
+            handleScanCode(decodedText);
+          },
+          (error: any) => {
+            // Silence scanning errors
+          }
+        ).catch((err: any) => {
+          console.warn('Erro ao ligar a câmara:', err);
+          setCameraSupported(false);
+        });
+      } catch (err) {
+        console.warn('Erro ao iniciar o leitor QR móvel:', err);
+        setCameraSupported(false);
+      }
+    };
+
+    startScanner();
+
+    return () => {
+      isScanningActive = false;
+      if (scanner) {
+        scanner.stop().catch((err: any) => {
+          console.warn('Erro ao parar câmara:', err);
+        });
+      }
+    };
   }, []);
 
   // Handle offline sync transition
@@ -137,6 +181,17 @@ export default function MobileValidationApp() {
       }
 
       setResultTicket(ticket);
+
+      // Verificar se o utilizador atual é um fiscal e se o bilhete pertence à sua transportadora
+      const currentUser = getCurrentUser();
+      if (currentUser && (currentUser.role === 'fiscal' || currentUser.role === 'FISCAL')) {
+        const fiscalCompany = currentUser.company_code || 'TRANSLUX'; // Default to TRANSLUX
+        if (ticket.carrierCode !== fiscalCompany) {
+          setResultStatus('WRONG_CARRIER');
+          toast.error(`Acesso Negado: Como fiscal da ${fiscalCompany}, não pode validar bilhetes da ${ticket.carrier || ticket.carrierCode}!`);
+          return;
+        }
+      }
 
       if (ticket.status === 'CANCELADO') {
         setResultStatus('INVALID');
@@ -270,15 +325,25 @@ export default function MobileValidationApp() {
                 {/* QR Scanner Mock */}
                 {resultStatus === 'NONE' && !scanning && (
                   <div className="space-y-4">
-                    {/* Fake Camera scanner */}
+                    {/* Real Camera scanner feed or Fallback */}
                     <div className="aspect-video bg-slate-950 border border-slate-900 rounded-2xl relative overflow-hidden flex items-center justify-center">
-                      <div className="absolute inset-x-0 h-0.5 bg-success shadow-lg z-10 animate-laser" />
-                      <div className="w-16 h-16 border border-dashed border-white/30 rounded-lg flex items-center justify-center">
-                        <QrCode className="text-white/20" size={24} />
-                      </div>
-                      <span className="absolute bottom-2 text-[8px] text-white/40 font-bold uppercase">
-                        Scanner Activo
-                      </span>
+                      {cameraSupported ? (
+                        <>
+                          <div id="qr-reader-mobile" className="w-full h-full" />
+                          {/* Laser scanner visual overlay */}
+                          <div className="absolute inset-x-0 h-0.5 bg-success shadow-lg z-10 animate-laser pointer-events-none" />
+                        </>
+                      ) : (
+                        <div className="text-center z-10 p-3 space-y-1">
+                          <QrCode size={28} className="text-white/20 mx-auto" />
+                          <span className="text-[9px] text-amber-500 font-bold uppercase tracking-wider block">
+                            Câmara Indisponível (Sem SSL)
+                          </span>
+                          <span className="text-[8px] text-white/40 max-w-[200px] mx-auto block leading-normal">
+                            Use a simulação rápida de leitura abaixo para testar o fluxo.
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Quick select dropdown simulator */}
@@ -356,6 +421,12 @@ export default function MobileValidationApp() {
                         <span>❌ Bilhete Inválido</span>
                       </div>
                     )}
+                    {resultStatus === 'WRONG_CARRIER' && (
+                      <div className="bg-danger/15 p-2.5 text-center text-danger flex items-center justify-center gap-1.5 font-black text-[10px] uppercase">
+                        <AlertTriangle size={14} />
+                        <span>⚠️ Outra Empresa</span>
+                      </div>
+                    )}
 
                     {/* Passenger specs */}
                     <div className="p-4 space-y-4 text-xs font-bold flex-1">
@@ -393,6 +464,18 @@ export default function MobileValidationApp() {
                           <span className="text-primary font-mono">{resultTicket.id}</span>
                         </div>
                       </div>
+
+                      {/* Wrong carrier warning */}
+                      {resultStatus === 'WRONG_CARRIER' && (
+                        <div className="p-2 bg-danger/5 border border-danger/25 rounded-xl flex gap-1 text-[9px] text-danger leading-relaxed font-semibold">
+                          <AlertTriangle size={12} className="text-danger flex-shrink-0 mt-0.5" />
+                          <span>
+                            Acesso Negado: Este bilhete é da operadora{' '}
+                            <strong>{resultTicket.carrier}</strong>. Como fiscal da{' '}
+                            <strong>{getCurrentUser()?.company_code || 'TRANSLUX'}</strong>, apenas tem autorização para validar bilhetes da sua própria transportadora.
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Trigger Actions */}

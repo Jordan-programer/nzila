@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Mail, Lock, ClipboardCopy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabaseClient';
 
 interface LoginFormData {
   email: string;
@@ -69,6 +70,22 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
     setValue('email', email);
     setValue('password', DEMO_PASSWORD);
     toast.info('Dados de demonstração preenchidos!');
+  };
+
+  const handleSocialLogin = async (provider: 'Google' | 'Facebook') => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider === 'Google' ? 'google' : 'facebook',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setIsLoading(false);
+      toast.error(`Erro ao ligar ao ${provider}: ${err.message || err}`);
+    }
   };
 
   const onSubmit = async (data: LoginFormData) => {
@@ -203,8 +220,18 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
                 : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
         isAdmin: selectedAccount.role === 'admin',
         role: selectedAccount.role === 'operador' ? 'OPERADOR' : selectedAccount.role,
-        company_id: selectedAccount.role === 'operador' ? 1 : undefined,
-        company_code: selectedAccount.role === 'operador' ? 'MACON' : undefined,
+        company_id:
+          selectedAccount.role === 'operador'
+            ? 1
+            : selectedAccount.role === 'fiscal'
+              ? 2
+              : undefined,
+        company_code:
+          selectedAccount.role === 'operador'
+            ? 'MACON'
+            : selectedAccount.role === 'fiscal'
+              ? 'TRANSLUX'
+              : undefined,
         company_status: selectedAccount.role === 'operador' ? 'APROVADA' : undefined,
       };
     } else {
@@ -241,7 +268,11 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
       {/* Social Auth */}
       <div className="grid grid-cols-2 gap-3">
-        <button type="button" className="social-btn">
+        <button
+          onClick={() => handleSocialLogin('Google')}
+          type="button"
+          className="social-btn"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
@@ -262,7 +293,11 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
           </svg>
           Google
         </button>
-        <button type="button" className="social-btn">
+        <button
+          onClick={() => handleSocialLogin('Facebook')}
+          type="button"
+          className="social-btn"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877F2">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
           </svg>

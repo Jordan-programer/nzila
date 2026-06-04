@@ -5,6 +5,7 @@ urlpatterns = [
     # Auth APIs
     path('auth/register/', views.register_user, name='register'),
     path('auth/login/', views.login_user, name='login'),
+    path('auth/social-login/', views.social_login_user, name='social_login'),
 
     # Trips APIs
     path('trips/', views.list_trips, name='list_trips'),

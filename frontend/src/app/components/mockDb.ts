@@ -9,6 +9,9 @@ export interface UserSession {
   document: string;
   avatar?: string;
   isAdmin?: boolean;
+  role?: string;
+  company_id?: number;
+  company_code?: string;
 }
 
 export interface Reservation {

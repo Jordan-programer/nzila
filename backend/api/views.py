@@ -88,6 +88,65 @@ def login_user(request):
         'user': serializer.data
     }, status=status.HTTP_200_OK)
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def social_login_user(request):
+    data = request.data
+    email = data.get('email')
+    name = data.get('name')
+    phone = data.get('phone', '')
+    document = data.get('document', '005432168LA045')
+    avatar = data.get('avatar', '')
+
+    if not email:
+        return Response({'error': 'Email é obrigatório.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(email=email)
+        # Update user profile if exists
+        try:
+            profile = user.profile
+            if (not profile.nome or profile.nome == email.split('@')[0]) and name:
+                profile.nome = name
+            if avatar and not profile.avatar:
+                profile.avatar = avatar
+            if phone and not profile.telefone:
+                profile.telefone = phone
+            profile.save()
+        except UserProfile.DoesNotExist:
+            UserProfile.objects.create(
+                user=user,
+                nome=name or email.split('@')[0],
+                email=email,
+                telefone=phone,
+                document=document,
+                avatar=avatar,
+                role='CLIENTE'
+            )
+    except User.DoesNotExist:
+        # Create new Django Auth User
+        username = email
+        password = User.objects.make_random_password()
+        user = User.objects.create_user(username=username, email=email, password=password)
+        
+        # Create UserProfile (mapped to table 'users')
+        UserProfile.objects.create(
+            user=user,
+            nome=name or email.split('@')[0],
+            email=email,
+            telefone=phone,
+            document=document,
+            avatar=avatar,
+            role='CLIENTE'
+        )
+
+    token, _ = Token.objects.get_or_create(user=user)
+    serializer = UserSerializer(user)
+    return Response({
+        'token': token.key,
+        'user': serializer.data
+    }, status=status.HTTP_200_OK)
+
 # ----------------------------------------------------
 # Trips Search & Filters
 # ----------------------------------------------------

@@ -11,7 +11,7 @@ interface AppLogoProps {
 }
 
 const AppLogo = memo(function AppLogo({
-  src = '',
+  src = '/assets/images/logo.png',
   size = 36,
   className = '',
   onClick,

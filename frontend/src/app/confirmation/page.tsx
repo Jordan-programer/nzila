@@ -105,77 +105,26 @@ function ConfirmationContent() {
 
   // Stylish detailed SVG QR code generator
   const renderQrCodeSvg = () => {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(reservation.id)}`;
     return (
-      <svg
+      <img
+        src={qrUrl}
+        alt={`QR Code para a reserva ${reservation.id}`}
         width="150"
         height="150"
-        viewBox="0 0 29 29"
-        className="text-foreground fill-current animate-pulse"
-      >
-        {/* Anchors (Top-Left) */}
-        <rect x="0" y="0" width="7" height="7" />
-        <rect x="1" y="1" width="5" height="5" fill="#FFF" />
-        <rect x="2" y="2" width="3" height="3" />
-
-        {/* Anchors (Top-Right) */}
-        <rect x="22" y="0" width="7" height="7" />
-        <rect x="23" y="1" width="5" height="5" fill="#FFF" />
-        <rect x="24" y="2" width="3" height="3" />
-
-        {/* Anchors (Bottom-Left) */}
-        <rect x="0" y="22" width="7" height="7" />
-        <rect x="1" y="23" width="5" height="5" fill="#FFF" />
-        <rect x="2" y="24" width="3" height="3" />
-
-        {/* Random QR pixels for simulation */}
-        <rect x="9" y="1" width="2" height="1" />
-        <rect x="13" y="0" width="1" height="3" />
-        <rect x="16" y="2" width="3" height="1" />
-        <rect x="20" y="1" width="1" height="2" />
-
-        <rect x="8" y="5" width="3" height="1" />
-        <rect x="12" y="4" width="2" height="2" />
-        <rect x="15" y="5" width="1" height="4" />
-        <rect x="19" y="4" width="2" height="1" />
-
-        <rect x="0" y="9" width="3" height="1" />
-        <rect x="4" y="8" width="1" height="3" />
-        <rect x="8" y="10" width="2" height="2" />
-        <rect x="11" y="9" width="3" height="1" />
-        <rect x="16" y="8" width="1" height="3" />
-        <rect x="19" y="9" width="4" height="2" />
-        <rect x="25" y="8" width="2" height="1" />
-
-        <rect x="2" y="14" width="4" height="1" />
-        <rect x="7" y="13" width="1" height="3" />
-        <rect x="10" y="15" width="2" height="1" />
-        <rect x="13" y="13" width="3" height="2" />
-        <rect x="17" y="14" width="1" height="3" />
-        <rect x="20" y="13" width="3" height="1" />
-        <rect x="24" y="14" width="2" height="3" />
-
-        <rect x="1" y="18" width="2" height="2" />
-        <rect x="5" y="19" width="3" height="1" />
-        <rect x="9" y="17" width="1" height="3" />
-        <rect x="12" y="19" width="4" height="1" />
-        <rect x="18" y="18" width="2" height="2" />
-        <rect x="21" y="19" width="3" height="1" />
-        <rect x="26" y="18" width="2" height="2" />
-
-        <rect x="8" y="23" width="3" height="1" />
-        <rect x="12" y="22" width="2" height="2" />
-        <rect x="15" y="24" width="3" height="1" />
-        <rect x="19" y="22" width="2" height="4" />
-      </svg>
+        className="text-foreground animate-pulse rounded-lg border border-border bg-white p-1"
+      />
     );
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background relative print:bg-white print:p-0">
-      <Header />
+    <div className="min-h-screen flex flex-col bg-background relative">
+      <div className="no-print">
+        <Header />
+      </div>
 
       {/* Confetti Particles Container */}
-      <div className="absolute inset-x-0 top-0 h-[600px] overflow-hidden pointer-events-none z-10 print:hidden">
+      <div className="absolute inset-x-0 top-0 h-[600px] overflow-hidden pointer-events-none z-10 no-print">
         {confetti.map((p) => (
           <div
             key={p.id}
@@ -203,7 +152,7 @@ function ConfirmationContent() {
 
       {/* Email View Modal */}
       {showEmailModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 print:hidden animate-fade-in">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 no-print animate-fade-in">
           <div className="w-full max-w-2xl bg-card border border-border rounded-3xl overflow-hidden shadow-2xl animate-bounce-in flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between px-6 py-4 bg-muted border-b border-border">
               <div className="flex items-center gap-2">
@@ -318,10 +267,10 @@ function ConfirmationContent() {
       )}
 
       {/* Main Body */}
-      <main className="flex-1 pt-24 pb-16 print:p-0">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 print:px-0">
+      <main className="flex-1 pt-24 pb-16">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
           {/* Confirmação Header */}
-          <div className="text-center mb-8 print:hidden">
+          <div className="text-center mb-8 no-print">
             {/* Pulsing circular success tick */}
             <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4 border border-success/20 animate-fade-in">
               <Check className="text-success w-8 h-8 stroke-[3]" />
@@ -335,7 +284,7 @@ function ConfirmationContent() {
           </div>
 
           {/* Action buttons (Top) */}
-          <div className="flex items-center justify-center gap-2.5 mb-8 print:hidden">
+          <div className="flex items-center justify-center gap-2.5 mb-8 no-print">
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-4 py-2.5 border border-border hover:bg-muted text-foreground rounded-xl text-xs font-bold transition-all hover:border-foreground/30 active:scale-95 shadow-sm"
@@ -361,7 +310,7 @@ function ConfirmationContent() {
           </div>
 
           {/* High-Fidelity Boarding Pass Ticket */}
-          <div className="bg-card border border-border rounded-3xl shadow-lg overflow-hidden animate-slide-up print:border-none print:shadow-none print:rounded-none">
+          <div className="bg-card border border-border rounded-3xl shadow-lg overflow-hidden animate-slide-up print:border-none print:shadow-none print:rounded-none printable-ticket">
             {/* Ticket Header Banner */}
             <div
               className={`p-4 ${reservation.carrierColor} text-white flex items-center justify-between print:bg-emerald-700`}
@@ -490,8 +439,28 @@ function ConfirmationContent() {
                 </div>
               </div>
 
+              {/* Detalhes do Pagamento */}
+              <div className="border-t border-border pt-6 mt-6 grid grid-cols-2 gap-6 text-xs font-semibold">
+                <div>
+                  <span className="block text-[10px] text-muted-foreground font-black uppercase tracking-wider mb-1">
+                    Valor Pago
+                  </span>
+                  <span className="text-sm font-black text-emerald-600">
+                    {reservation.price.toLocaleString('pt-AO')} Kz
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-muted-foreground font-black uppercase tracking-wider mb-1">
+                    Método de Pagamento
+                  </span>
+                  <span className="text-sm font-bold text-foreground">
+                    {reservation.paymentMethod || 'Multicaixa Express'}
+                  </span>
+                </div>
+              </div>
+
               {/* Boarding pass tear section separator (visual only) */}
-              <div className="flex items-center justify-between my-4 print:hidden">
+              <div className="flex items-center justify-between my-4 no-print">
                 <div className="w-4 h-8 bg-background border-r border-border rounded-r-full -ml-8 flex-shrink-0" />
                 <div className="flex-1 border-t border-dashed border-border" />
                 <div className="w-4 h-8 bg-background border-l border-border rounded-l-full -mr-8 flex-shrink-0" />
@@ -532,7 +501,7 @@ function ConfirmationContent() {
           </div>
 
           {/* Footer note and Area cliente prompt */}
-          <div className="text-center mt-8 space-y-4 print:hidden">
+          <div className="text-center mt-8 space-y-4 no-print">
             <p className="text-xs text-muted-foreground font-medium max-w-md mx-auto leading-relaxed">
               Deseja gerir as suas viagens ou solicitar cancelamento? Aceda à sua{' '}
               <button
@@ -554,7 +523,9 @@ function ConfirmationContent() {
         </div>
       </main>
 
-      <Footer />
+      <div className="no-print">
+        <Footer />
+      </div>
     </div>
   );
 }
