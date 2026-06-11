@@ -7,6 +7,7 @@ class UserProfile(models.Model):
         ('CLIENTE', 'CLIENTE'),
         ('ADMIN', 'ADMIN'),
         ('OPERADOR', 'OPERADOR'),
+        ('FISCAL', 'FISCAL'),
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     nome = models.CharField(max_length=100)
@@ -53,6 +54,7 @@ class Company(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
     motivo_rejeicao = models.TextField(blank=True, null=True)
     logo_url = models.CharField(max_length=250, blank=True, null=True)
+    logo = models.FileField(upload_to='company_logos/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
     # Frontend compatibility fields
@@ -276,3 +278,19 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notificacao {self.id} | User {self.user.username} | {self.tipo}"
+
+class PopularRoute(models.Model):
+    origem = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='popular_routes_from')
+    destino = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='popular_routes_to')
+    imagem = models.FileField(upload_to='popular_routes/', blank=True, null=True)
+    duracao = models.CharField(max_length=50, default='8h 30min')
+    preco_desde = models.DecimalField(max_digits=10, decimal_places=2)
+    frequencia = models.CharField(max_length=50, default='Diário')
+    trending = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'popular_routes'
+
+    def __str__(self):
+        return f"Rota Popular: {self.origem.nome} -> {self.destino.nome}"

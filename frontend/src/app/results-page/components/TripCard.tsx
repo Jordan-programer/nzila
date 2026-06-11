@@ -47,9 +47,8 @@ export default function TripCard({ trip }: TripCardProps) {
 
   const handleSelect = () => {
     // If the user is already logged in, skip the login screen
-    const stored = typeof window !== 'undefined'
-      ? localStorage.getItem('nzila_current_user')
-      : null;
+    const stored =
+      typeof window !== 'undefined' ? localStorage.getItem('nzila_current_user') : null;
     if (stored) {
       router.push(`/payment?trip=${trip.id}`);
     } else {

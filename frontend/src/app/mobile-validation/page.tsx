@@ -3,7 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { getReservations, updateReservationStatus, getCurrentUser, Reservation } from '@/app/components/mockDb';
+import {
+  getReservations,
+  updateReservationStatus,
+  getCurrentUser,
+  Reservation,
+} from '@/app/components/mockDb';
 import { toast } from 'sonner';
 import {
   QrCode,
@@ -46,7 +51,9 @@ export default function MobileValidationApp() {
 
   // Validation result overlay
   const [resultTicket, setResultTicket] = useState<Reservation | null>(null);
-  const [resultStatus, setResultStatus] = useState<'NONE' | 'VALID' | 'USED' | 'INVALID' | 'WRONG_CARRIER'>('NONE');
+  const [resultStatus, setResultStatus] = useState<
+    'NONE' | 'VALID' | 'USED' | 'INVALID' | 'WRONG_CARRIER'
+  >('NONE');
   const [syncing, setSyncing] = useState(false);
   const [cameraSupported, setCameraSupported] = useState(true);
 
@@ -80,26 +87,28 @@ export default function MobileValidationApp() {
     const startScanner = async () => {
       try {
         const { Html5Qrcode } = await import('html5-qrcode');
-        
+
         scanner = new Html5Qrcode('qr-reader-mobile');
-        
-        await scanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 150, height: 150 },
-          },
-          (decodedText: string) => {
-            if (!isScanningActive) return;
-            handleScanCode(decodedText);
-          },
-          (error: any) => {
-            // Silence scanning errors
-          }
-        ).catch((err: any) => {
-          console.warn('Erro ao ligar a câmara:', err);
-          setCameraSupported(false);
-        });
+
+        await scanner
+          .start(
+            { facingMode: 'environment' },
+            {
+              fps: 10,
+              qrbox: { width: 150, height: 150 },
+            },
+            (decodedText: string) => {
+              if (!isScanningActive) return;
+              handleScanCode(decodedText);
+            },
+            (error: any) => {
+              // Silence scanning errors
+            }
+          )
+          .catch((err: any) => {
+            console.warn('Erro ao ligar a câmara:', err);
+            setCameraSupported(false);
+          });
       } catch (err) {
         console.warn('Erro ao iniciar o leitor QR móvel:', err);
         setCameraSupported(false);
@@ -188,7 +197,9 @@ export default function MobileValidationApp() {
         const fiscalCompany = currentUser.company_code || 'TRANSLUX'; // Default to TRANSLUX
         if (ticket.carrierCode !== fiscalCompany) {
           setResultStatus('WRONG_CARRIER');
-          toast.error(`Acesso Negado: Como fiscal da ${fiscalCompany}, não pode validar bilhetes da ${ticket.carrier || ticket.carrierCode}!`);
+          toast.error(
+            `Acesso Negado: Como fiscal da ${fiscalCompany}, não pode validar bilhetes da ${ticket.carrier || ticket.carrierCode}!`
+          );
           return;
         }
       }
@@ -472,7 +483,8 @@ export default function MobileValidationApp() {
                           <span>
                             Acesso Negado: Este bilhete é da operadora{' '}
                             <strong>{resultTicket.carrier}</strong>. Como fiscal da{' '}
-                            <strong>{getCurrentUser()?.company_code || 'TRANSLUX'}</strong>, apenas tem autorização para validar bilhetes da sua própria transportadora.
+                            <strong>{getCurrentUser()?.company_code || 'TRANSLUX'}</strong>, apenas
+                            tem autorização para validar bilhetes da sua própria transportadora.
                           </span>
                         </div>
                       )}

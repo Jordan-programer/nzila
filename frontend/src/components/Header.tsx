@@ -241,7 +241,7 @@ export default function Header() {
                           Sem novas notificações.
                         </div>
                       ) : (
-                      <div className="max-h-60 overflow-y-auto space-y-2">
+                        <div className="max-h-60 overflow-y-auto space-y-2">
                           {userNotifs.map((n) => {
                             const link = getNotifLink(n);
                             const isClickable = !!link;
@@ -271,7 +271,10 @@ export default function Header() {
                               <button
                                 key={n.id}
                                 type="button"
-                                onClick={() => { setIsNotifOpen(false); router.push(link); }}
+                                onClick={() => {
+                                  setIsNotifOpen(false);
+                                  router.push(link);
+                                }}
                                 className="w-full p-2 hover:bg-primary/5 rounded-xl space-y-1 transition-all border border-primary/20 bg-primary/5 text-left cursor-pointer"
                               >
                                 {content}
@@ -390,7 +393,10 @@ export default function Header() {
                             <button
                               key={n.id}
                               type="button"
-                              onClick={() => { setIsNotifOpen(false); router.push(link); }}
+                              onClick={() => {
+                                setIsNotifOpen(false);
+                                router.push(link);
+                              }}
                               className="w-full p-2 hover:bg-primary/5 rounded-xl space-y-1 transition-all border border-primary/20 bg-primary/5 text-left cursor-pointer"
                             >
                               {content}

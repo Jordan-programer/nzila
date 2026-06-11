@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     UserProfile, Company, Location, Route, Bus, Seat,
-    Trip, Reservation, ReservationSeat, Payment, Ticket, Notification
+    Trip, Reservation, ReservationSeat, Payment, Ticket, Notification,
+    PopularRoute
 )
 
 @admin.register(UserProfile)
@@ -63,3 +64,8 @@ class TicketAdmin(admin.ModelAdmin):
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ('user', 'tipo', 'enviado', 'created_at')
     list_filter = ('tipo', 'enviado')
+
+@admin.register(PopularRoute)
+class PopularRouteAdmin(admin.ModelAdmin):
+    list_display = ('origem', 'destino', 'preco_desde', 'frequencia', 'trending')
+    search_fields = ('origem__nome', 'destino__nome')

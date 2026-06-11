@@ -9,7 +9,7 @@ from api.models import (
 )
 
 class Command(BaseCommand):
-    help = 'Seeds the 12 normalized SQLite database tables with demo transport data.'
+    help = 'Seeds the 12 database tables with demo transport data.'
 
     def handle(self, *args, **kwargs):
         self.stdout.write('Clearing database tables...')
@@ -243,7 +243,7 @@ class Command(BaseCommand):
         users_list = [
             {'email': 'fatima.manuel@transbook.ao', 'name': 'Fátima Manuel', 'phone': '+244 923 456 789', 'doc': '005432168LA045', 'role': 'CLIENTE'},
             {'email': 'admin@transbook.ao', 'name': 'Carlos Admin', 'phone': '+244 912 999 888', 'doc': '008765432LA099', 'role': 'ADMIN'},
-            {'email': 'fiscal@transbook.ao', 'name': 'João Fiscal', 'phone': '+244 933 222 111', 'doc': '009876543LA077', 'role': 'OPERADOR'},
+            {'email': 'fiscal@transbook.ao', 'name': 'João Fiscal', 'phone': '+244 933 222 111', 'doc': '009876543LA077', 'role': 'FISCAL'},
             {'email': 'macon.operator@transbook.ao', 'name': 'Macon Operador', 'phone': '+244 923 101 010', 'doc': '002345678LA099', 'role': 'OPERADOR', 'company_code': 'MACON'},
             # Other passengers in history
             {'email': 'antonio.g@gmail.com', 'name': 'António Gouveia', 'phone': '+244 934 111 222', 'doc': '002135689LA088', 'role': 'CLIENTE'},
@@ -433,4 +433,4 @@ class Command(BaseCommand):
                 enviado=True
             )
 
-        self.stdout.write(self.style.SUCCESS('Successfully seeded 12 normalized SQLite tables!'))
+        self.stdout.write(self.style.SUCCESS('Successfully seeded the database tables!'))

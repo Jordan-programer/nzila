@@ -6,6 +6,7 @@ urlpatterns = [
     path('auth/register/', views.register_user, name='register'),
     path('auth/login/', views.login_user, name='login'),
     path('auth/social-login/', views.social_login_user, name='social_login'),
+    path('auth/send-client-otp/', views.send_client_otp, name='send_client_otp'),
 
     # Trips APIs
     path('trips/', views.list_trips, name='list_trips'),
@@ -47,4 +48,11 @@ urlpatterns = [
     path('carrier/trips/', views.carrier_manage_trips, name='carrier_manage_trips'),
     path('carrier/trips/<int:pk>/', views.carrier_manage_trips, name='carrier_manage_trip_detail'),
     path('notifications/', views.list_notifications, name='list_notifications'),
+    
+    # Dynamic Popular Routes & Transport Companies API URLs
+    path('public/popular-routes/', views.public_popular_routes, name='public_popular_routes'),
+    path('public/carriers/', views.public_carriers, name='public_carriers'),
+    path('admin/popular-routes/', views.manage_popular_routes, name='manage_popular_routes'),
+    path('admin/popular-routes/<int:pk>/', views.popular_route_detail, name='popular_route_detail'),
+    path('admin/carriers/upload-logo/', views.upload_company_logo, name='upload_company_logo'),
 ]

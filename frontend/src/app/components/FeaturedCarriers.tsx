@@ -1,54 +1,38 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import { Star, MapPin } from 'lucide-react';
 
-const carriers = [
-  {
-    key: 'carrier-macon',
-    name: 'Macon Transportes',
-    shortName: 'MACON',
-    rating: 4.7,
-    reviews: 1243,
-    routes: 18,
-    color: 'bg-blue-600',
-    textColor: 'text-white',
-    description: 'Líder em transporte interprovincial desde 1998. Frota moderna e climatizada.',
-  },
-  {
-    key: 'carrier-sgo',
-    name: 'SGO Express',
-    shortName: 'SGO',
-    rating: 4.5,
-    reviews: 876,
-    routes: 12,
-    color: 'bg-green-600',
-    textColor: 'text-white',
-    description: 'Especialista em rotas do sul de Angola. Conforto e pontualidade garantidos.',
-  },
-  {
-    key: 'carrier-translux',
-    name: 'Translux Angola',
-    shortName: 'TRANSLUX',
-    rating: 4.8,
-    reviews: 2156,
-    routes: 24,
-    color: 'bg-orange-600',
-    textColor: 'text-white',
-    description: 'A maior rede de rotas em Angola. Serviço VIP disponível em todas as rotas.',
-  },
-  {
-    key: 'carrier-unitrans',
-    name: 'Unitrans Angola',
-    shortName: 'UNITRANS',
-    rating: 4.4,
-    reviews: 654,
-    routes: 9,
-    color: 'bg-purple-600',
-    textColor: 'text-white',
-    description: 'Especializada em rotas do norte. Frota renovada com Wi-Fi a bordo.',
-  },
-];
 
 export default function FeaturedCarriers() {
+  const [carriers, setCarriers] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchCarriers() {
+      try {
+        const res = await fetch('http://localhost:8000/api/public/carriers/');
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        const mapped = data.map((c: any) => ({
+          key: `carrier-db-${c.id}`,
+          name: c.nome,
+          shortName: c.code || c.nome.substring(0, 3).toUpperCase(),
+          rating: c.rating || 4.5,
+          reviews: c.reviews || 100,
+          routes: 10, // Default fallback count for routes
+          color: c.color || 'bg-blue-600',
+          textColor: 'text-white',
+          description: c.descricao || 'Empresa parceira oficial da rede de transportes Nzila.',
+          logo: c.logo ? (c.logo.startsWith('http') ? c.logo : `http://localhost:8000${c.logo}`) : '',
+        }));
+        setCarriers(mapped);
+      } catch (err) {
+        console.warn('Could not fetch carriers from API:', err);
+      }
+    }
+    fetchCarriers();
+  }, []);
+
   return (
     <section className="py-14 lg:py-20 bg-background">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
@@ -71,10 +55,20 @@ export default function FeaturedCarriers() {
               className="bg-card border border-border rounded-2xl overflow-hidden card-hover"
             >
               {/* Logo area */}
-              <div className={`${carrier?.color} h-20 flex items-center justify-center`}>
-                <span className={`text-2xl font-black ${carrier?.textColor} tracking-wide`}>
-                  {carrier?.shortName}
-                </span>
+              <div className="h-20 bg-muted flex items-center justify-center p-3 relative overflow-hidden">
+                {carrier?.logo ? (
+                  <img
+                    src={carrier?.logo}
+                    alt={carrier?.name}
+                    className="h-full object-contain"
+                  />
+                ) : (
+                  <div className={`absolute inset-0 ${carrier?.color || 'bg-blue-600'} flex items-center justify-center`}>
+                    <span className="text-2xl font-black text-white tracking-wide">
+                      {carrier?.shortName}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="p-4">

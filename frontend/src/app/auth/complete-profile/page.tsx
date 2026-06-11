@@ -61,7 +61,10 @@ function CompleteProfileForm() {
           name: backendData.user.name,
           phone: backendData.user.phone || phone,
           document: backendData.user.document || document || '005432168LA045',
-          avatar: backendData.user.avatar || avatarParam || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          avatar:
+            backendData.user.avatar ||
+            avatarParam ||
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
           role: backendData.user.role.toLowerCase(),
           isAdmin: backendData.user.role === 'ADMIN',
           company_id: backendData.user.company_id,
@@ -76,8 +79,17 @@ function CompleteProfileForm() {
         toast.success(`Bem-vindo ao Nzila, ${loggedUser.name}! Registo concluído.`);
         router.push(redirectParam);
       } else {
-        const data = await response.json();
-        toast.error(data.error || 'Falha ao concluir o registo do seu perfil.');
+        let errorMsg = 'Falha ao concluir o registo do seu perfil.';
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            errorMsg = data.error || errorMsg;
+          }
+        } catch (e) {
+          console.error('Failed to parse error response:', e);
+        }
+        toast.error(errorMsg);
       }
     } catch (err) {
       console.error('Erro ao sincronizar com backend:', err);
@@ -183,8 +195,7 @@ function CompleteProfileForm() {
         >
           {isLoading ? (
             <>
-              <Loader2 className="animate-spin w-4 h-4" />
-              A guardar perfil...
+              <Loader2 className="animate-spin w-4 h-4" />A guardar perfil...
             </>
           ) : (
             'Concluir Registo'

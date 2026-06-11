@@ -3,7 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { getReservations, updateReservationStatus, getCurrentUser, Reservation } from '@/app/components/mockDb';
+import {
+  getReservations,
+  updateReservationStatus,
+  getCurrentUser,
+  Reservation,
+} from '@/app/components/mockDb';
 import { toast } from 'sonner';
 import {
   QrCode,
@@ -45,27 +50,29 @@ export default function TicketValidationPage() {
     const startScanner = async () => {
       try {
         const { Html5Qrcode } = await import('html5-qrcode');
-        
+
         scanner = new Html5Qrcode('qr-reader');
-        
-        await scanner.start(
-          { facingMode: 'environment' },
-          {
-            fps: 10,
-            qrbox: { width: 220, height: 220 },
-          },
-          (decodedText: string) => {
-            if (!isScanningActive) return;
-            setInputCode(decodedText);
-            handleValidate(decodedText);
-          },
-          (error: any) => {
-            // Silence scanning errors
-          }
-        ).catch((err: any) => {
-          console.warn('Erro ao ligar a câmara:', err);
-          setCameraSupported(false);
-        });
+
+        await scanner
+          .start(
+            { facingMode: 'environment' },
+            {
+              fps: 10,
+              qrbox: { width: 220, height: 220 },
+            },
+            (decodedText: string) => {
+              if (!isScanningActive) return;
+              setInputCode(decodedText);
+              handleValidate(decodedText);
+            },
+            (error: any) => {
+              // Silence scanning errors
+            }
+          )
+          .catch((err: any) => {
+            console.warn('Erro ao ligar a câmara:', err);
+            setCameraSupported(false);
+          });
       } catch (err) {
         console.warn('Erro ao iniciar o leitor QR físico:', err);
         setCameraSupported(false);
@@ -113,7 +120,9 @@ export default function TicketValidationPage() {
         const fiscalCompany = currentUser.company_code || 'TRANSLUX'; // Default to TRANSLUX
         if (ticket.carrierCode !== fiscalCompany) {
           setValidationResult('WRONG_CARRIER');
-          toast.error(`Acesso Negado: Como fiscal da ${fiscalCompany}, não tem permissão para validar bilhetes da ${ticket.carrier || ticket.carrierCode}!`);
+          toast.error(
+            `Acesso Negado: Como fiscal da ${fiscalCompany}, não tem permissão para validar bilhetes da ${ticket.carrier || ticket.carrierCode}!`
+          );
           return;
         }
       }
@@ -219,7 +228,8 @@ export default function TicketValidationPage() {
                           Câmara Indisponível (Sem SSL/HTTPS)
                         </span>
                         <span className="text-[9px] text-white/40 max-w-[220px] mx-auto block leading-normal font-medium">
-                          O navegador bloqueia a câmara em ligações HTTP simples. Use o simulador rápido abaixo.
+                          O navegador bloqueia a câmara em ligações HTTP simples. Use o simulador
+                          rápido abaixo.
                         </span>
                       </div>
                     )}
@@ -352,7 +362,12 @@ export default function TicketValidationPage() {
                         <p className="text-[11px] text-danger leading-relaxed font-semibold">
                           Acesso Negado: Este bilhete pertence à operadora{' '}
                           <strong className="underline">{scannedTicket.carrier}</strong>.<br />
-                          Como fiscal da <strong className="underline">{getCurrentUser()?.company_code || 'TRANSLUX'}</strong>, apenas tem autorização para confirmar embarques da sua própria transportadora.
+                          Como fiscal da{' '}
+                          <strong className="underline">
+                            {getCurrentUser()?.company_code || 'TRANSLUX'}
+                          </strong>
+                          , apenas tem autorização para confirmar embarques da sua própria
+                          transportadora.
                         </p>
                       </div>
                     )}

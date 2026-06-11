@@ -17,7 +17,7 @@ export default function AuthCallbackPage() {
 
         if (data?.session?.user) {
           const user = data.session.user;
-          
+
           // Map Supabase user metadata to Nzila session structure using the backend
           let loggedUser;
           try {
@@ -34,7 +34,7 @@ export default function AuthCallbackPage() {
 
             if (response.ok) {
               const backendData = await response.json();
-              
+
               // Se o utilizador não tem telefone registado no backend, redireciona para completar perfil
               if (!backendData.user.phone) {
                 const queryParams = new URLSearchParams({
@@ -42,7 +42,7 @@ export default function AuthCallbackPage() {
                   name: user.user_metadata?.full_name || user.user_metadata?.name || '',
                   avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
                 }).toString();
-                
+
                 toast.info('Por favor, informe o seu número de telefone para concluir o registo.');
                 router.push(`/auth/complete-profile?${queryParams}`);
                 return;
@@ -53,7 +53,9 @@ export default function AuthCallbackPage() {
                 name: backendData.user.name,
                 phone: backendData.user.phone,
                 document: backendData.user.document || '005432168LA045',
-                avatar: backendData.user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                avatar:
+                  backendData.user.avatar ||
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
                 role: backendData.user.role.toLowerCase(),
                 isAdmin: backendData.user.role === 'ADMIN',
                 company_id: backendData.user.company_id,
@@ -78,7 +80,7 @@ export default function AuthCallbackPage() {
                 name: user.user_metadata?.full_name || user.user_metadata?.name || '',
                 avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
               }).toString();
-              
+
               toast.info('Por favor, informe o seu número de telefone para concluir o registo.');
               router.push(`/auth/complete-profile?${queryParams}`);
               return;
@@ -89,17 +91,20 @@ export default function AuthCallbackPage() {
               name: user.user_metadata?.full_name || user.user_metadata?.name || 'Cliente Social',
               phone: socialPhone || '+244 923 456 789',
               document: '005432168LA045',
-              avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+              avatar:
+                user.user_metadata?.avatar_url ||
+                user.user_metadata?.picture ||
+                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
               role: 'cliente',
             };
           }
 
           // Store in LocalStorage to maintain compatibility with existing session hook systems
           localStorage.setItem('nzila_current_user', JSON.stringify(loggedUser));
-          
+
           // Emit storage event to update Header and app states in other tabs
           window.dispatchEvent(new Event('storage'));
-          
+
           toast.success(`Bem-vindo, ${loggedUser.name}! Autenticado com sucesso.`);
           router.push('/');
         } else {

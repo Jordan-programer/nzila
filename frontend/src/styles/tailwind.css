@@ -261,12 +261,12 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  
+
   body {
     background: white !important;
     color: black !important;
   }
-  
+
   /* Collapse non-printable elements completely to prevent blank pages */
   .no-print,
   .no-print * {

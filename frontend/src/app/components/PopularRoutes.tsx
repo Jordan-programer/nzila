@@ -1,71 +1,38 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clock, TrendingUp } from 'lucide-react';
 
-const popularRoutes = [
-  {
-    key: 'route-lda-hbo',
-    origin: 'Luanda',
-    destination: 'Huambo',
-    duration: '8h 30min',
-    priceFrom: 4500,
-    trending: true,
-    frequency: 'Diário',
-    image: 'bg-gradient-to-br from-blue-500 to-blue-700',
-  },
-  {
-    key: 'route-lda-bge',
-    origin: 'Luanda',
-    destination: 'Benguela',
-    duration: '6h 00min',
-    priceFrom: 3800,
-    trending: true,
-    frequency: 'Diário',
-    image: 'bg-gradient-to-br from-indigo-500 to-indigo-700',
-  },
-  {
-    key: 'route-lda-nam',
-    origin: 'Luanda',
-    destination: 'Namibe',
-    duration: '12h 00min',
-    priceFrom: 6200,
-    trending: false,
-    frequency: '3x por semana',
-    image: 'bg-gradient-to-br from-sky-500 to-sky-700',
-  },
-  {
-    key: 'route-hbo-lbo',
-    origin: 'Huambo',
-    destination: 'Lubango',
-    duration: '5h 30min',
-    priceFrom: 3200,
-    trending: false,
-    frequency: 'Diário',
-    image: 'bg-gradient-to-br from-violet-500 to-violet-700',
-  },
-  {
-    key: 'route-lda-mal',
-    origin: 'Luanda',
-    destination: 'Malanje',
-    duration: '4h 00min',
-    priceFrom: 2800,
-    trending: true,
-    frequency: 'Diário',
-    image: 'bg-gradient-to-br from-emerald-500 to-emerald-700',
-  },
-  {
-    key: 'route-lda-uig',
-    origin: 'Luanda',
-    destination: 'Uíge',
-    duration: '5h 00min',
-    priceFrom: 3100,
-    trending: false,
-    frequency: '2x por semana',
-    image: 'bg-gradient-to-br from-amber-500 to-amber-700',
-  },
-];
 
 export default function PopularRoutes() {
+  const [routes, setRoutes] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function fetchPopularRoutes() {
+      try {
+        const res = await fetch('http://localhost:8000/api/public/popular-routes/');
+        if (!res.ok) throw new Error('API Error');
+        const data = await res.json();
+        const mapped = data.map((r: any) => ({
+          key: `route-db-${r.id}`,
+          origin: r.origin,
+          destination: r.destination,
+          duration: r.duracao,
+          priceFrom: parseFloat(r.preco_desde),
+          trending: r.trending,
+          frequency: r.frequencia,
+          image: r.imagem ? (r.imagem.startsWith('http') ? r.imagem : `http://localhost:8000${r.imagem}`) : '',
+          gradient: 'bg-gradient-to-br from-blue-500 to-blue-700', // default gradient fallback
+        }));
+        setRoutes(mapped);
+      } catch (err) {
+        console.warn('Could not fetch popular routes from API:', err);
+      }
+    }
+    fetchPopularRoutes();
+  }, []);
+
   return (
     <section className="py-14 lg:py-20 bg-background" id="destinos">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
@@ -87,14 +54,23 @@ export default function PopularRoutes() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-4 lg:gap-5">
-          {popularRoutes?.map((route) => (
+          {routes?.map((route) => (
             <Link
               key={route?.key}
-              href="/results-page"
+              href={`/results-page?origin=${encodeURIComponent(route?.origin)}&destination=${encodeURIComponent(route?.destination)}`}
               className="group bg-card border border-border rounded-2xl overflow-hidden card-hover block"
             >
-              {/* Color Banner */}
-              <div className={`h-24 ${route?.image} relative`}>
+              {/* Image Banner */}
+              <div className="h-28 relative overflow-hidden bg-muted">
+                {route?.image ? (
+                  <img
+                    src={route?.image}
+                    alt={`${route?.origin} para ${route?.destination}`}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className={`w-full h-full ${route?.gradient || 'bg-gradient-to-br from-blue-500 to-blue-700'}`} />
+                )}
                 <div className="absolute inset-0 bg-black/20" />
                 {route?.trending && (
                   <div className="absolute top-3 right-3 flex items-center gap-1 bg-warning text-warning-foreground text-xs font-semibold px-2 py-1 rounded-full">

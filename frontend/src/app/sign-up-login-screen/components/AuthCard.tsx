@@ -10,9 +10,12 @@ type Tab = 'login' | 'register';
 
 export default function AuthCard() {
   const [activeTab, setActiveTab] = useState<Tab>('login');
+  const [isCarrier, setIsCarrier] = useState(false);
 
   return (
-    <div className="w-full max-w-md">
+    <div
+      className={`w-full transition-all duration-300 ${activeTab === 'register' && isCarrier ? 'max-w-2xl' : 'max-w-md'}`}
+    >
       {/* Logo */}
       <div className="flex flex-col items-center mb-6">
         <div className="flex items-center gap-2.5 mb-2">
@@ -52,7 +55,10 @@ export default function AuthCard() {
           {activeTab === 'login' ? (
             <LoginForm onSwitchToRegister={() => setActiveTab('register')} />
           ) : (
-            <RegisterForm onSwitchToLogin={() => setActiveTab('login')} />
+            <RegisterForm
+              onSwitchToLogin={() => setActiveTab('login')}
+              onRegisterTypeChange={(type) => setIsCarrier(type === 'transportadora')}
+            />
           )}
         </div>
       </div>

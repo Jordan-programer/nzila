@@ -69,6 +69,9 @@ DATABASES = {
     }
 }
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = 'pt-pt'
@@ -92,10 +95,11 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # Configuração de E-mail
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = 'api.email_backend.HybridEmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_PORT = 465
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = True
 EMAIL_HOST_USER = 'marylisboapedro@gmail.com'
 EMAIL_HOST_PASSWORD = 'wpcf ubno huvi qdga'
 DEFAULT_FROM_EMAIL = 'Nzila <marylisboapedro@gmail.com>'

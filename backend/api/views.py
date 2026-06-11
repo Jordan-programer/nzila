@@ -15,7 +15,7 @@ from django.db.models import Sum
 from .models import (
     UserProfile, Company, Location, Route, Bus, Seat,
     Trip, Reservation, ReservationSeat, Payment, Ticket, Notification,
-    CompanyAdmin, CompanyDocument
+    CompanyAdmin, CompanyDocument, PopularRoute
 )
 from .serializers import (
     UserSerializer,
@@ -26,6 +26,7 @@ from .serializers import (
     CompanyDocumentSerializer,
     CompanyAdminSerializer,
     NotificationSerializer,
+    PopularRouteSerializer,
 )
 
 # ----------------------------------------------------
@@ -67,6 +68,43 @@ def register_user(request):
         'token': token.key,
         'user': serializer.data
     }, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_client_otp(request):
+    data = request.data
+    email = data.get('email')
+    name = data.get('name')
+
+    if not email:
+        return Response({'error': 'O email é obrigatório.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if User.objects.filter(username=email).exists():
+        return Response({'error': 'Este email já está registado no sistema.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Generate 6-digit OTP code
+    otp_code = str(random.randint(100000, 999999))
+
+    # Send actual email to the user with verification code
+    try:
+        subject = "Nzila - Verificação de E-mail"
+        message = (
+            f"Olá {name or 'Passageiro'},\n\n"
+            f"Obrigado por se registar no Nzila.\n"
+            f"Para ativar a sua conta, insira o seguinte código no formulário de registo:\n\n"
+            f"Código OTP: {otp_code}\n\n"
+            f"Melhores cumprimentos,\n"
+            f"Equipa Nzila"
+        )
+        from_email = settings.DEFAULT_FROM_EMAIL
+        send_mail(subject, message, from_email, [email], fail_silently=False)
+    except Exception as e:
+        print(f"Erro ao enviar e-mail de verificação de cliente: {e}")
+
+    return Response({
+        'success': 'Código de verificação enviado.',
+        'otp': otp_code
+    }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -126,7 +164,8 @@ def social_login_user(request):
     except User.DoesNotExist:
         # Create new Django Auth User
         username = email
-        password = User.objects.make_random_password()
+        import secrets
+        password = secrets.token_urlsafe(16)
         user = User.objects.create_user(username=username, email=email, password=password)
         
         # Create UserProfile (mapped to table 'users')
@@ -219,10 +258,11 @@ def manage_reservations(request):
         try:
             passenger_user = User.objects.get(email=passenger_email)
         except User.DoesNotExist:
+            import secrets
             passenger_user = User.objects.create_user(
                 username=passenger_email,
                 email=passenger_email,
-                password=User.objects.make_random_password()
+                password=secrets.token_urlsafe(16)
             )
             UserProfile.objects.create(
                 user=passenger_user,
@@ -1083,6 +1123,152 @@ def resend_carrier_otp(request):
         'success': 'Código OTP reenviado com sucesso.',
         'otp': otp_code
     }, status=status.HTTP_200_OK)
+
+
+# ----------------------------------------------------
+# Dynamic Popular Routes & Transport Companies views
+# ----------------------------------------------------
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_popular_routes(request):
+    routes = PopularRoute.objects.all().order_by('-created_at')
+    serializer = PopularRouteSerializer(routes, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def public_carriers(request):
+    companies = Company.objects.filter(status='APROVADA').order_by('-created_at')
+    serializer = CompanySerializer(companies, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+def manage_popular_routes(request):
+    if request.method == 'GET':
+        routes = PopularRoute.objects.all().order_by('-created_at')
+        serializer = PopularRouteSerializer(routes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        data = request.data
+        origem_id = data.get('origem')
+        destino_id = data.get('destino')
+        preco_desde = data.get('preco_desde')
+        duracao = data.get('duracao', '8h 30min')
+        frequencia = data.get('frequencia', 'Diário')
+        trending = data.get('trending')
+        
+        # trending can be sent as string "true" or "false" from FormData
+        if isinstance(trending, str):
+            trending = trending.lower() == 'true'
+        elif trending is None:
+            trending = True
+
+        imagem = request.FILES.get('imagem')
+
+        if not origem_id or not destino_id or not preco_desde:
+            return Response({'error': 'Origem, destino e preço são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            origem = Location.objects.get(pk=origem_id)
+            destino = Location.objects.get(pk=destino_id)
+        except Location.DoesNotExist:
+            return Response({'error': 'Origem ou destino não encontrados.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        popular_route = PopularRoute.objects.create(
+            origem=origem,
+            destino=destino,
+            preco_desde=float(preco_desde),
+            duracao=duracao,
+            frequencia=frequencia,
+            trending=trending,
+            imagem=imagem
+        )
+        serializer = PopularRouteSerializer(popular_route)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def popular_route_detail(request, pk):
+    try:
+        popular_route = PopularRoute.objects.get(pk=pk)
+    except PopularRoute.DoesNotExist:
+        return Response({'error': 'Rota popular não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = PopularRouteSerializer(popular_route)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        data = request.data
+        origem_id = data.get('origem')
+        destino_id = data.get('destino')
+        preco_desde = data.get('preco_desde')
+        duracao = data.get('duracao')
+        frequencia = data.get('frequencia')
+        trending = data.get('trending')
+        imagem = request.FILES.get('imagem')
+
+        if origem_id:
+            try:
+                popular_route.origem = Location.objects.get(pk=origem_id)
+            except Location.DoesNotExist:
+                return Response({'error': 'Origem não encontrada.'}, status=status.HTTP_400_BAD_REQUEST)
+        if destino_id:
+            try:
+                popular_route.destino = Location.objects.get(pk=destino_id)
+            except Location.DoesNotExist:
+                return Response({'error': 'Destino não encontrado.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if preco_desde:
+            popular_route.preco_desde = float(preco_desde)
+        if duracao:
+            popular_route.duracao = duracao
+        if frequencia:
+            popular_route.frequencia = frequencia
+        
+        if trending is not None:
+            if isinstance(trending, str):
+                popular_route.trending = trending.lower() == 'true'
+            else:
+                popular_route.trending = bool(trending)
+                
+        if imagem:
+            popular_route.imagem = imagem
+        
+        popular_route.save()
+        serializer = PopularRouteSerializer(popular_route)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    elif request.method == 'DELETE':
+        popular_route.delete()
+        return Response({'success': 'Rota popular removida com sucesso.'}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def upload_company_logo(request):
+    company_id = request.data.get('company_id')
+    logo = request.FILES.get('logo')
+
+    if not company_id or not logo:
+        return Response({'error': 'ID da transportadora e imagem são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        company = Company.objects.get(pk=company_id)
+    except Company.DoesNotExist:
+        return Response({'error': 'Transportadora não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    company.logo = logo
+    company.save()
+    
+    # Mirror logo file URL to logo_url for absolute backward compatibility
+    company.logo_url = company.logo.url
+    company.save()
+
+    serializer = CompanySerializer(company)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 

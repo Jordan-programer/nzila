@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, Company, Location, Route, Bus, Seat,
     Trip, Reservation, ReservationSeat, Payment, Ticket, Notification,
-    CompanyAdmin, CompanyDocument
+    CompanyAdmin, CompanyDocument, PopularRoute
 )
 
 class UserSerializer(serializers.ModelSerializer):
@@ -247,4 +247,14 @@ class CompanyDocumentSerializer(serializers.ModelSerializer):
 class CompanyAdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = CompanyAdmin
+        fields = '__all__'
+
+class PopularRouteSerializer(serializers.ModelSerializer):
+    origin = serializers.CharField(source='origem.nome', read_only=True)
+    destination = serializers.CharField(source='destino.nome', read_only=True)
+    origin_provincia = serializers.CharField(source='origem.provincia', read_only=True)
+    destination_provincia = serializers.CharField(source='destino.provincia', read_only=True)
+
+    class Meta:
+        model = PopularRoute
         fields = '__all__'

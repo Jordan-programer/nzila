@@ -44,6 +44,7 @@ import {
   X,
   Plus,
   Loader2,
+  ArrowRight,
 } from 'lucide-react';
 
 function AdminDashboardContent() {
@@ -54,17 +55,19 @@ function AdminDashboardContent() {
 
   // Tabs management
   const [adminTab, setAdminTab] = useState<
-    'indicadores' | 'reservas' | 'empresas' | 'rotas' | 'viagens' | 'relatorios' | 'locations'
+    'indicadores' | 'reservas' | 'empresas' | 'rotas' | 'viagens' | 'relatorios' | 'locations' | 'rotas_populares'
   >('indicadores');
 
   // On mount: check ?tab= URL param to deep-link directly to a tab
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['indicadores', 'reservas', 'empresas', 'locations'].includes(tabParam)) {
+    if (tabParam && ['indicadores', 'reservas', 'empresas', 'locations', 'rotas_populares'].includes(tabParam)) {
       setAdminTab(tabParam as any);
       // Refresh carriers when navigating directly to empresas tab
       if (tabParam === 'empresas') {
         fetchCarriers();
+      } else if (tabParam === 'rotas_populares') {
+        fetchPopularRoutes();
       }
     }
   }, [searchParams]);
@@ -90,6 +93,25 @@ function AdminDashboardContent() {
   const [formNome, setFormNome] = useState('');
   const [formProvincia, setFormProvincia] = useState('');
   const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+
+  // Popular Routes state
+  const [popularRoutes, setPopularRoutes] = useState<any[]>([]);
+  const [isLoadingPR, setIsLoadingPR] = useState(false);
+  const [isPopularRouteModalOpen, setIsPopularRouteModalOpen] = useState(false);
+  const [editingPopularRoute, setEditingPopularRoute] = useState<any | null>(null);
+  
+  const [formPROrigem, setFormPROrigem] = useState('');
+  const [formPRDestino, setFormPRDestino] = useState('');
+  const [formPRPreco, setFormPRPreco] = useState('');
+  const [formPRDuracao, setFormPRDuracao] = useState('8h 30min');
+  const [formPRFrequencia, setFormPRFrequencia] = useState('Diário');
+  const [formPRTrending, setFormPRTrending] = useState(true);
+  const [formPRImagem, setFormPRImagem] = useState<File | null>(null);
+
+  // Carrier Logo upload state
+  const [logoUploadModalOpen, setLogoUploadModalOpen] = useState(false);
+  const [logoUploadTargetId, setLogoUploadTargetId] = useState<number | null>(null);
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
 
   // Carrier Reviews management
   const [carriers, setCarriers] = useState<any[]>([]);
@@ -339,6 +361,115 @@ function AdminDashboardContent() {
     }
   };
 
+  const fetchPopularRoutes = async () => {
+    setIsLoadingPR(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/popular-routes/');
+      if (!res.ok) throw new Error('HTTP error');
+      const data = await res.json();
+      setPopularRoutes(data);
+    } catch (err) {
+      console.warn('Fallback to empty popular routes:', err);
+    } finally {
+      setIsLoadingPR(false);
+    }
+  };
+
+  const handleSavePopularRoute = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formPROrigem || !formPRDestino || !formPRPreco) {
+      toast.error('Origem, destino e preço são obrigatórios.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('origem', formPROrigem);
+    formData.append('destino', formPRDestino);
+    formData.append('preco_desde', formPRPreco);
+    formData.append('duracao', formPRDuracao);
+    formData.append('frequencia', formPRFrequencia);
+    formData.append('trending', String(formPRTrending));
+    if (formPRImagem) {
+      formData.append('imagem', formPRImagem);
+    }
+
+    try {
+      let url = 'http://localhost:8000/api/admin/popular-routes/';
+      let method = 'POST';
+
+      if (editingPopularRoute) {
+        url = `http://localhost:8000/api/admin/popular-routes/${editingPopularRoute.id}/`;
+        method = 'PUT';
+      }
+
+      const res = await fetch(url, {
+        method: method,
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('API Error');
+      toast.success(editingPopularRoute ? 'Rota popular atualizada com sucesso!' : 'Rota popular cadastrada com sucesso!');
+      
+      setIsPopularRouteModalOpen(false);
+      setEditingPopularRoute(null);
+      setFormPROrigem('');
+      setFormPRDestino('');
+      setFormPRPreco('');
+      setFormPRDuracao('8h 30min');
+      setFormPRFrequencia('Diário');
+      setFormPRTrending(true);
+      setFormPRImagem(null);
+      
+      fetchPopularRoutes();
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao salvar rota popular.');
+    }
+  };
+
+  const handleDeletePopularRoute = async (id: number) => {
+    try {
+      const deleteRes = await fetch(`http://localhost:8000/api/admin/popular-routes/${id}/`, {
+        method: 'DELETE',
+      });
+      if (!deleteRes.ok) throw new Error('Failed to delete');
+      toast.success('Rota popular removida com sucesso!');
+      fetchPopularRoutes();
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao remover rota popular.');
+    }
+  };
+
+  const handleUploadLogo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logoUploadTargetId || !selectedLogoFile) {
+      toast.error('Selecione uma imagem para o logo.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('company_id', String(logoUploadTargetId));
+    formData.append('logo', selectedLogoFile);
+
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/carriers/upload-logo/', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Upload failed');
+      toast.success('Logo da transportadora atualizado com sucesso!');
+      setLogoUploadModalOpen(false);
+      setLogoUploadTargetId(null);
+      setSelectedLogoFile(null);
+      fetchCarriers();
+    } catch (err) {
+      console.error(err);
+      toast.error('Erro ao carregar o logo.');
+    }
+  };
+
   const refreshReservations = () => {
     setReservations(getReservations());
   };
@@ -347,6 +478,7 @@ function AdminDashboardContent() {
     refreshReservations();
     fetchLocations();
     fetchCarriers();
+    fetchPopularRoutes();
   }, []);
 
   // Calculations
@@ -646,6 +778,216 @@ function AdminDashboardContent() {
         </div>
       )}
 
+      {/* Popular Route CRUD Modal */}
+      {isPopularRouteModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-base font-bold text-foreground">
+                {editingPopularRoute ? 'Editar Rota Popular' : 'Adicionar Rota Popular'}
+              </h3>
+              <button
+                onClick={() => {
+                  setIsPopularRouteModalOpen(false);
+                  setEditingPopularRoute(null);
+                  setFormPROrigem('');
+                  setFormPRDestino('');
+                  setFormPRPreco('');
+                  setFormPRDuracao('8h 30min');
+                  setFormPRFrequencia('Diário');
+                  setFormPRTrending(true);
+                  setFormPRImagem(null);
+                }}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleSavePopularRoute} className="space-y-4 text-sm font-semibold">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5 font-sans">
+                  Origem
+                </label>
+                <select
+                  required
+                  value={formPROrigem}
+                  onChange={(e) => setFormPROrigem(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary font-sans cursor-pointer"
+                >
+                  <option value="">Selecione a Origem</option>
+                  {locations.map((loc) => (
+                    <option key={`orig-${loc.id}`} value={loc.id}>
+                      {loc.nome} ({loc.provincia})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5 font-sans">
+                  Destino
+                </label>
+                <select
+                  required
+                  value={formPRDestino}
+                  onChange={(e) => setFormPRDestino(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary font-sans cursor-pointer"
+                >
+                  <option value="">Selecione o Destino</option>
+                  {locations.map((loc) => (
+                    <option key={`dest-${loc.id}`} value={loc.id}>
+                      {loc.nome} ({loc.provincia})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5 font-sans">
+                  Preço Base (A partir de)
+                </label>
+                <input
+                  type="number"
+                  required
+                  placeholder="Ex: 4500"
+                  value={formPRPreco}
+                  onChange={(e) => setFormPRPreco(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary font-sans"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5 font-sans">
+                    Duração
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: 8h 30min"
+                    value={formPRDuracao}
+                    onChange={(e) => setFormPRDuracao(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5 font-sans">
+                    Frequência
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Diário"
+                    value={formPRFrequencia}
+                    onChange={(e) => setFormPRFrequencia(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary font-sans"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="trending"
+                  checked={formPRTrending}
+                  onChange={(e) => setFormPRTrending(e.target.checked)}
+                  className="w-4 h-4 text-primary bg-background border-input rounded focus:ring-primary cursor-pointer"
+                />
+                <label htmlFor="trending" className="text-xs font-semibold text-muted-foreground cursor-pointer">
+                  Destino Popular (Destaque)
+                </label>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5 font-sans">
+                  Imagem do Destino
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFormPRImagem(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPopularRouteModalOpen(false);
+                    setEditingPopularRoute(null);
+                    setFormPROrigem('');
+                    setFormPRDestino('');
+                    setFormPRPreco('');
+                    setFormPRDuracao('8h 30min');
+                    setFormPRFrequencia('Diário');
+                    setFormPRTrending(true);
+                    setFormPRImagem(null);
+                  }}
+                  className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-colors"
+                >
+                  {editingPopularRoute ? 'Salvar' : 'Adicionar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Carrier Logo Upload Modal */}
+      {logoUploadModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-base font-bold text-foreground">Upload de Logo da Transportadora</h3>
+              <button
+                onClick={() => {
+                  setLogoUploadModalOpen(false);
+                  setLogoUploadTargetId(null);
+                  setSelectedLogoFile(null);
+                }}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleUploadLogo} className="space-y-4 text-sm font-semibold">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5 font-sans">
+                  Imagem do Logo
+                </label>
+                <input
+                  type="file"
+                  required
+                  accept="image/*"
+                  onChange={(e) => setSelectedLogoFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLogoUploadModalOpen(false);
+                    setLogoUploadTargetId(null);
+                    setSelectedLogoFile(null);
+                  }}
+                  className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-colors"
+                >
+                  Upload Logo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Rejection Reason Modal */}
       {rejectionModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
@@ -726,9 +1068,13 @@ function AdminDashboardContent() {
                 { id: 'reservas', label: 'Reservas', icon: Ticket },
                 { id: 'empresas', label: 'Empresas & Rotas', icon: Building2 },
                 { id: 'locations', label: 'Localidades', icon: MapPin },
+                { id: 'rotas_populares', label: 'Rotas Populares', icon: TrendingUp },
               ].map((tab) => {
                 const Icon = tab.icon;
-                const pendingCount = tab.id === 'empresas' ? carriers.filter((c) => c.status === 'PENDENTE').length : 0;
+                const pendingCount =
+                  tab.id === 'empresas'
+                    ? carriers.filter((c) => c.status === 'PENDENTE').length
+                    : 0;
                 return (
                   <button
                     key={tab.id}
@@ -1066,7 +1412,8 @@ function AdminDashboardContent() {
                     {carriers.filter((c) => c.status === 'PENDENTE').length > 0 && (
                       <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs font-bold text-amber-600">
                         <span className="inline-block w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-                        {carriers.filter((c) => c.status === 'PENDENTE').length} transportadora(s) aguardam aprovação — aparecem em destaque abaixo.
+                        {carriers.filter((c) => c.status === 'PENDENTE').length} transportadora(s)
+                        aguardam aprovação — aparecem em destaque abaixo.
                         <button
                           type="button"
                           onClick={fetchCarriers}
@@ -1096,153 +1443,172 @@ function AdminDashboardContent() {
                             return 0;
                           })
                           .map((c) => (
-                          <tr key={c.id} className={`font-medium transition-colors ${
-                            c.status === 'PENDENTE'
-                              ? 'bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-400'
-                              : 'hover:bg-muted/10'
-                          }`}>
-                            <td className="p-3">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center font-extrabold text-[10px] text-primary overflow-hidden">
-                                  {c.logo_url ? (
-                                    <img
-                                      src={c.logo_url}
-                                      alt="Logo"
-                                      className="w-full h-full object-contain"
-                                    />
-                                  ) : (
-                                    c.code || c.nome.substring(0, 3).toUpperCase()
-                                  )}
+                            <tr
+                              key={c.id}
+                              className={`font-medium transition-colors ${
+                                c.status === 'PENDENTE'
+                                  ? 'bg-amber-500/5 hover:bg-amber-500/10 border-l-2 border-l-amber-400'
+                                  : 'hover:bg-muted/10'
+                              }`}
+                            >
+                              <td className="p-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center font-extrabold text-[10px] text-primary overflow-hidden">
+                                    {c.logo_url || c.logo ? (
+                                      <img
+                                        src={
+                                          (c.logo_url || c.logo).startsWith('http')
+                                            ? (c.logo_url || c.logo)
+                                            : `http://localhost:8000${c.logo_url || c.logo}`
+                                        }
+                                        alt="Logo"
+                                        className="w-full h-full object-contain"
+                                      />
+                                    ) : (
+                                      c.code || c.nome.substring(0, 3).toUpperCase()
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="block font-bold text-foreground text-sm font-sans">
+                                      {c.nome}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                      {c.email} | {c.telefone}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div>
-                                  <span className="block font-bold text-foreground text-sm font-sans">
-                                    {c.nome}
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground font-mono">
-                                    {c.email} | {c.telefone}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              <span className="block font-semibold text-foreground">
-                                NIF: {c.nif || 'Não informado'}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground block">
-                                {c.endereco ? `${c.endereco}, ` : ''}
-                                {c.municipio || ''} ({c.provincia || ''})
-                              </span>
-                            </td>
-                            <td className="p-3">
-                              {c.admins && c.admins.length > 0 ? (
-                                <div>
-                                  <span className="block font-semibold text-foreground">
-                                    {c.admins[0].nome}
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground block">
-                                    {c.admins[0].cargo || 'Gerente'} | BI:{' '}
-                                    {c.admins[0].documento_identificacao || '-'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground italic text-[11px]">
-                                  Nenhum cadastrado
+                              </td>
+                              <td className="p-3">
+                                <span className="block font-semibold text-foreground">
+                                  NIF: {c.nif || 'Não informado'}
                                 </span>
-                              )}
-                            </td>
-                            <td className="p-3">
-                              {c.documents && c.documents.length > 0 ? (
-                                <div className="flex flex-col gap-1 max-w-[200px]">
-                                  {c.documents.map((d: any, dIdx: number) => (
-                                    <a
-                                      key={`doc-${dIdx}`}
-                                      href={d.arquivo_url}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="text-[10px] text-primary hover:underline font-bold truncate flex items-center gap-1"
-                                      title={d.tipo}
-                                    >
-                                      <span>📄 {d.tipo.replace('_', ' ')}</span>
-                                      <span
-                                        className={`text-[8px] px-1 rounded-sm ${d.aprovado ? 'bg-success/15 text-success' : 'bg-amber-500/15 text-amber-500'}`}
+                                <span className="text-[10px] text-muted-foreground block">
+                                  {c.endereco ? `${c.endereco}, ` : ''}
+                                  {c.municipio || ''} ({c.provincia || ''})
+                                </span>
+                              </td>
+                              <td className="p-3">
+                                {c.admins && c.admins.length > 0 ? (
+                                  <div>
+                                    <span className="block font-semibold text-foreground">
+                                      {c.admins[0].nome}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground block">
+                                      {c.admins[0].cargo || 'Gerente'} | BI:{' '}
+                                      {c.admins[0].documento_identificacao || '-'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground italic text-[11px]">
+                                    Nenhum cadastrado
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                {c.documents && c.documents.length > 0 ? (
+                                  <div className="flex flex-col gap-1 max-w-[200px]">
+                                    {c.documents.map((d: any, dIdx: number) => (
+                                      <a
+                                        key={`doc-${dIdx}`}
+                                        href={d.arquivo_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-[10px] text-primary hover:underline font-bold truncate flex items-center gap-1"
+                                        title={d.tipo}
                                       >
-                                        {d.aprovado ? 'Aprovado' : 'Pendente'}
-                                      </span>
-                                    </a>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground italic text-[11px]">
-                                  Sem documentos
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-3">
-                              <span
-                                className={`inline-block px-2.5 py-0.5 border rounded-full text-[9px] font-black tracking-wide ${
-                                  c.status === 'APROVADA'
-                                    ? 'bg-success/10 border-success/20 text-success'
-                                    : c.status === 'PENDENTE'
-                                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-500'
-                                      : c.status === 'REJEITADA'
-                                        ? 'bg-danger/10 border-danger/20 text-danger'
-                                        : 'bg-slate-500/10 border-slate-500/20 text-slate-600'
-                                }`}
-                              >
-                                {c.status}
-                              </span>
-                              {c.status === 'REJEITADA' && c.motivo_rejeicao && (
+                                        <span>📄 {d.tipo.replace('_', ' ')}</span>
+                                        <span
+                                          className={`text-[8px] px-1 rounded-sm ${d.aprovado ? 'bg-success/15 text-success' : 'bg-amber-500/15 text-amber-500'}`}
+                                        >
+                                          {d.aprovado ? 'Aprovado' : 'Pendente'}
+                                        </span>
+                                      </a>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground italic text-[11px]">
+                                    Sem documentos
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3">
                                 <span
-                                  className="block text-[8px] text-danger max-w-[150px] truncate mt-0.5"
-                                  title={c.motivo_rejeicao}
+                                  className={`inline-block px-2.5 py-0.5 border rounded-full text-[9px] font-black tracking-wide ${
+                                    c.status === 'APROVADA'
+                                      ? 'bg-success/10 border-success/20 text-success'
+                                      : c.status === 'PENDENTE'
+                                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-500'
+                                        : c.status === 'REJEITADA'
+                                          ? 'bg-danger/10 border-danger/20 text-danger'
+                                          : 'bg-slate-500/10 border-slate-500/20 text-slate-600'
+                                  }`}
                                 >
-                                  Motivo: {c.motivo_rejeicao}
+                                  {c.status}
                                 </span>
-                              )}
-                            </td>
-                            <td className="p-3 text-right flex items-center justify-end gap-1 flex-wrap">
-                              {c.status === 'PENDENTE' && (
-                                <>
+                                {c.status === 'REJEITADA' && c.motivo_rejeicao && (
+                                  <span
+                                    className="block text-[8px] text-danger max-w-[150px] truncate mt-0.5"
+                                    title={c.motivo_rejeicao}
+                                  >
+                                    Motivo: {c.motivo_rejeicao}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3 text-right flex items-center justify-end gap-1 flex-wrap">
+                                {c.status === 'PENDENTE' && (
+                                  <>
+                                    <button
+                                      onClick={() => handleReviewCarrier(c.id, 'APROVADA')}
+                                      title="Aprovar Cadastro"
+                                      className="px-2 py-1 bg-success text-success-foreground hover:bg-emerald-700 font-bold rounded-lg text-[10px] transition-colors"
+                                    >
+                                      Aprovar
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setRejectionTargetId(c.id);
+                                        setRejectionModalOpen(true);
+                                      }}
+                                      title="Rejeitar Cadastro"
+                                      className="px-2 py-1 bg-danger text-danger-foreground hover:bg-red-700 font-bold rounded-lg text-[10px] transition-colors"
+                                    >
+                                      Rejeitar
+                                    </button>
+                                  </>
+                                )}
+                                {c.status === 'APROVADA' && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setLogoUploadTargetId(c.id);
+                                        setLogoUploadModalOpen(true);
+                                      }}
+                                      title="Upload Logo"
+                                      className="px-2 py-1 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-lg text-[10px] transition-colors"
+                                    >
+                                      Logo
+                                    </button>
+                                    <button
+                                      onClick={() => handleReviewCarrier(c.id, 'SUSPENSA')}
+                                      title="Suspender Operação"
+                                      className="px-2 py-1 bg-slate-500 text-white hover:bg-slate-600 font-bold rounded-lg text-[10px] transition-colors"
+                                    >
+                                      Suspender
+                                    </button>
+                                  </>
+                                )}
+                                {c.status === 'SUSPENSA' && (
                                   <button
                                     onClick={() => handleReviewCarrier(c.id, 'APROVADA')}
-                                    title="Aprovar Cadastro"
-                                    className="px-2 py-1 bg-success text-success-foreground hover:bg-emerald-700 font-bold rounded-lg text-[10px] transition-colors"
+                                    title="Reativar Operação"
+                                    className="px-2 py-1 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-lg text-[10px] transition-colors"
                                   >
-                                    Aprovar
+                                    Reativar
                                   </button>
-                                  <button
-                                    onClick={() => {
-                                      setRejectionTargetId(c.id);
-                                      setRejectionModalOpen(true);
-                                    }}
-                                    title="Rejeitar Cadastro"
-                                    className="px-2 py-1 bg-danger text-danger-foreground hover:bg-red-700 font-bold rounded-lg text-[10px] transition-colors"
-                                  >
-                                    Rejeitar
-                                  </button>
-                                </>
-                              )}
-                              {c.status === 'APROVADA' && (
-                                <button
-                                  onClick={() => handleReviewCarrier(c.id, 'SUSPENSA')}
-                                  title="Suspender Operação"
-                                  className="px-2 py-1 bg-slate-500 text-white hover:bg-slate-600 font-bold rounded-lg text-[10px] transition-colors"
-                                >
-                                  Suspender
-                                </button>
-                              )}
-                              {c.status === 'SUSPENSA' && (
-                                <button
-                                  onClick={() => handleReviewCarrier(c.id, 'APROVADA')}
-                                  title="Reativar Operação"
-                                  className="px-2 py-1 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-lg text-[10px] transition-colors"
-                                >
-                                  Reativar
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                                )}
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                     </table>
                   </div>
@@ -1416,6 +1782,148 @@ function AdminDashboardContent() {
                             </td>
                           </tr>
                         ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 5: Popular Routes CRUD */}
+          {adminTab === 'rotas_populares' && (
+            <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm animate-fade-in">
+              <div className="flex items-center justify-between mb-6 border-b border-border pb-4 flex-wrap gap-4 font-sans">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                    <TrendingUp className="text-primary w-5 h-5" />
+                    <span>Gerenciamento de Rotas Populares</span>
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1 font-sans">
+                    Gerencie os destinos populares exibidos na página inicial e anexe imagens.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingPopularRoute(null);
+                    setFormPROrigem('');
+                    setFormPRDestino('');
+                    setFormPRPreco('');
+                    setFormPRDuracao('8h 30min');
+                    setFormPRFrequencia('Diário');
+                    setFormPRTrending(true);
+                    setFormPRImagem(null);
+                    setIsPopularRouteModalOpen(true);
+                  }}
+                  className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-accent transition-all active:scale-95 flex items-center gap-1.5 font-sans"
+                >
+                  <Plus size={14} />
+                  <span>Nova Rota Popular</span>
+                </button>
+              </div>
+
+              {isLoadingPR ? (
+                <div className="text-center py-16 text-muted-foreground font-sans">
+                  Carregando rotas populares...
+                </div>
+              ) : popularRoutes.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground font-sans">
+                  Nenhuma rota popular cadastrada.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-border/80 text-muted-foreground font-black uppercase tracking-wider text-[9px] bg-muted/40 font-sans">
+                        <th className="p-3">Destino / Imagem</th>
+                        <th className="p-3">Preço a partir de</th>
+                        <th className="p-3">Duração & Frequência</th>
+                        <th className="p-3">Popular</th>
+                        <th className="p-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {popularRoutes.map((route) => (
+                        <tr key={route.id} className="hover:bg-muted/10 font-medium">
+                          <td className="p-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-14 h-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center border border-border flex-shrink-0">
+                                {route.imagem ? (
+                                  <img
+                                    src={route.imagem.startsWith('http') ? route.imagem : `http://localhost:8000${route.imagem}`}
+                                    alt={`${route.origin} para ${route.destination}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-[9px] text-muted-foreground italic">Sem Foto</span>
+                                )}
+                              </div>
+                              <div>
+                                <span className="font-bold text-foreground text-sm font-sans flex items-center gap-1.5">
+                                  {route.origin} <ArrowRight size={12} className="text-muted-foreground" /> {route.destination}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground block font-mono">
+                                  {route.origin_provincia} para {route.destination_provincia}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3 text-sm font-bold text-foreground font-sans">
+                            {parseFloat(route.preco_desde).toLocaleString('pt-AO')} Kz
+                          </td>
+                          <td className="p-3 font-semibold text-muted-foreground text-sm font-sans">
+                            <div className="flex items-center gap-2">
+                              <span>⏱️ {route.duracao}</span>
+                              <span className="text-border">|</span>
+                              <span>📅 {route.frequencia}</span>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`inline-block px-2.5 py-0.5 border rounded-full text-[9px] font-black tracking-wide ${
+                                route.trending
+                                  ? 'bg-success/10 border-success/20 text-success'
+                                  : 'bg-muted text-muted-foreground border-border'
+                              }`}
+                            >
+                              {route.trending ? 'SIM' : 'NÃO'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingPopularRoute(route);
+                                setFormPROrigem(String(route.origem));
+                                setFormPRDestino(String(route.destino));
+                                setFormPRPreco(String(route.preco_desde));
+                                setFormPRDuracao(route.duracao);
+                                setFormPRFrequencia(route.frequencia);
+                                setFormPRTrending(route.trending);
+                                setFormPRImagem(null);
+                                setIsPopularRouteModalOpen(true);
+                              }}
+                              title="Editar Rota Popular"
+                              className="p-1.5 border border-border hover:bg-muted rounded-lg text-foreground transition-colors flex items-center justify-center"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Tem a certeza que deseja eliminar a rota popular de "${route.origin}" para "${route.destination}"?`
+                                  )
+                                ) {
+                                  handleDeletePopularRoute(route.id);
+                                }
+                              }}
+                              title="Eliminar Rota"
+                              className="p-1.5 border border-danger/25 text-danger hover:bg-danger/5 rounded-lg transition-colors flex items-center justify-center"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

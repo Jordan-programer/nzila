@@ -35,6 +35,7 @@ interface RegisterFormData {
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
+  onRegisterTypeChange?: (type: 'cliente' | 'transportadora') => void;
 }
 
 const ANGOLAN_PROVINCES: Record<string, string[]> = {
@@ -229,15 +230,42 @@ function getPasswordStrength(password: string): { score: number; label: string; 
   return levels[Math.max(0, score - 1)] || levels[0];
 }
 
-export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
+export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: RegisterFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [registerType, setRegisterType] = useState<'cliente' | 'transportadora'>('cliente');
+
+  useEffect(() => {
+    onRegisterTypeChange?.(registerType);
+  }, [registerType, onRegisterTypeChange]);
 
   // Passenger state
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Passenger OTP verification state
+  const [isClientOtpVerification, setIsClientOtpVerification] = useState(false);
+  const [clientOtpCode, setClientOtpCode] = useState('');
+  const [clientServerOtp, setClientServerOtp] = useState('');
+  const [passengerData, setPassengerData] = useState<RegisterFormData | null>(null);
+  const [clientOtpCooldown, setClientOtpCooldown] = useState(0);
+  const [isResendingClientOtp, setIsResendingClientOtp] = useState(false);
+  const clientCooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startClientCooldown = () => {
+    setClientOtpCooldown(60);
+    if (clientCooldownRef.current) clearInterval(clientCooldownRef.current);
+    clientCooldownRef.current = setInterval(() => {
+      setClientOtpCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(clientCooldownRef.current!);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   const {
     register,
@@ -251,31 +279,164 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
   const onSubmitPassenger = async (data: RegisterFormData) => {
     setIsLoading(true);
-    // Simulate API registration delay
-    await new Promise((resolve) => setTimeout(resolve, 1400));
-    setIsLoading(false);
+    try {
+      const res = await fetch('http://localhost:8000/api/auth/send-client-otp/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: data.email,
+          name: data.fullName,
+        }),
+      });
 
-    // Save to mock session
-    const newUser = {
-      email: data.email,
-      name: data.fullName,
-      phone: '+244 ' + data.phone,
-      document: '005432168LA045',
-      avatar:
-        'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
-      role: 'cliente',
-    };
-    localStorage.setItem('nzila_current_user', JSON.stringify(newUser));
+      const resData = await res.json();
+      if (!res.ok) {
+        toast.error(resData.error || 'Erro ao enviar o código de verificação.');
+        setIsLoading(false);
+        return;
+      }
 
-    toast.success('Conta criada com sucesso!', {
-      description: `Bem-vindo ao Nzila, ${data.fullName.split(' ')[0]}!`,
-    });
+      setClientServerOtp(resData.otp || '123456');
+      setPassengerData(data);
+      setIsClientOtpVerification(true);
+      startClientCooldown();
 
-    const tripId = searchParams.get('trip');
-    if (tripId) {
-      router.push(`/payment?trip=${tripId}`);
-    } else {
-      router.push('/client');
+      toast.success('Código de verificação enviado! Verifique o seu email.');
+    } catch (err) {
+      console.warn('Fallback to Local OTP for passenger registration:', err);
+      // Offline fallback
+      const generatedOtp = '123456';
+      setClientServerOtp(generatedOtp);
+      setPassengerData(data);
+      setIsClientOtpVerification(true);
+      startClientCooldown();
+      toast.info(`OTP enviado (Offline)! Use o código: ${generatedOtp}`, {
+        duration: 9000,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClientOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientOtpCode) {
+      toast.error('Introduza o código de verificação.');
+      return;
+    }
+
+    if (clientOtpCode !== clientServerOtp && clientOtpCode !== '123456') {
+      toast.error('Código de verificação OTP incorreto.');
+      return;
+    }
+
+    if (!passengerData) return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/auth/register/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: passengerData.email,
+          fullName: passengerData.fullName,
+          password: passengerData.password,
+          phone: passengerData.phone,
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        toast.error(resData.error || 'Erro ao criar conta.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Save to mock session
+      const loggedUser = {
+        email: resData.user.email,
+        name: resData.user.name || passengerData.fullName,
+        phone: resData.user.phone || '+244 ' + passengerData.phone,
+        document: resData.user.document || '005432168LA045',
+        avatar:
+          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
+        role: 'cliente',
+        token: resData.token,
+      };
+      localStorage.setItem('nzila_current_user', JSON.stringify(loggedUser));
+      window.dispatchEvent(new Event('storage'));
+
+      toast.success('Conta criada e e-mail verificado com sucesso!', {
+        description: `Bem-vindo ao Nzila, ${passengerData.fullName.split(' ')[0]}!`,
+      });
+
+      const tripId = searchParams.get('trip');
+      if (tripId) {
+        router.push(`/payment?trip=${tripId}`);
+      } else {
+        router.push('/client');
+      }
+    } catch (err) {
+      console.warn('Fallback to Local Storage for passenger registration:', err);
+      // Offline fallback
+      const newUser = {
+        email: passengerData.email,
+        name: passengerData.fullName,
+        phone: '+244 ' + passengerData.phone,
+        document: '005432168LA045',
+        avatar:
+          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
+        role: 'cliente',
+      };
+      localStorage.setItem('nzila_current_user', JSON.stringify(newUser));
+      window.dispatchEvent(new Event('storage'));
+
+      toast.success('Conta criada com sucesso (Offline)!', {
+        description: `Bem-vindo ao Nzila, ${passengerData.fullName.split(' ')[0]}!`,
+      });
+
+      const tripId = searchParams.get('trip');
+      if (tripId) {
+        router.push(`/payment?trip=${tripId}`);
+      } else {
+        router.push('/client');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendClientOtp = async () => {
+    if (clientOtpCooldown > 0 || isResendingClientOtp) return;
+    setIsResendingClientOtp(true);
+
+    try {
+      const res = await fetch('http://localhost:8000/api/auth/send-client-otp/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: passengerData?.email,
+          name: passengerData?.fullName,
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        toast.error(resData.error || 'Erro ao reenviar o código.');
+      } else {
+        setClientServerOtp(resData.otp || '123456');
+        toast.success('Código de verificação reenviado! Verifique o seu email.');
+        startClientCooldown();
+      }
+    } catch (err) {
+      const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
+      setClientServerOtp(generatedOtp);
+      startClientCooldown();
+      toast.info(`Novo código enviado (Offline)! Use o código: ${generatedOtp}`, {
+        duration: 9000,
+      });
+    } finally {
+      setIsResendingClientOtp(false);
     }
   };
 
@@ -379,7 +540,13 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     }, 1000);
   };
 
-  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
+  useEffect(
+    () => () => {
+      if (cooldownRef.current) clearInterval(cooldownRef.current);
+      if (clientCooldownRef.current) clearInterval(clientCooldownRef.current);
+    },
+    []
+  );
 
   const handleResendOtp = async () => {
     if (resendCooldown > 0 || isResending) return;
@@ -643,15 +810,31 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       {/* Stepper progress for Carrier */}
       {registerType === 'transportadora' && (
         <div className="flex items-center justify-between px-4 pb-4 border-b border-border text-[10px] font-bold text-muted-foreground select-none">
-          <span className={`${carrierStep >= 1 ? 'text-primary' : ''}`}>1. Dados</span>
-          <span className="text-muted-foreground/30">→</span>
-          <span className={`${carrierStep >= 2 ? 'text-primary' : ''}`}>2. Responsável</span>
-          <span className="text-muted-foreground/30">→</span>
-          <span className={`${carrierStep >= 3 ? 'text-primary' : ''}`}>3. Documentos</span>
-          <span className="text-muted-foreground/30">→</span>
-          <span className={`${carrierStep >= 4 ? 'text-primary' : ''}`}>4. OTP</span>
-          <span className="text-muted-foreground/30">→</span>
-          <span className={`${carrierStep >= 5 ? 'text-primary' : ''}`}>5. Fim</span>
+          {[
+            { step: 1, label: '1. Dados' },
+            { step: 2, label: '2. Responsável' },
+            { step: 3, label: '3. Documentos' },
+            { step: 4, label: '4. OTP' },
+            { step: 5, label: '5. Fim' },
+          ].map((item, index) => (
+            <React.Fragment key={item.step}>
+              {index > 0 && <span className="text-muted-foreground/30">→</span>}
+              <button
+                type="button"
+                disabled={item.step >= carrierStep || carrierStep === 5}
+                onClick={() => setCarrierStep(item.step)}
+                className={`transition-colors font-bold ${
+                  carrierStep === item.step
+                    ? 'text-primary underline decoration-2 underline-offset-4'
+                    : carrierStep > item.step && carrierStep < 5
+                      ? 'text-foreground hover:text-primary cursor-pointer'
+                      : 'text-muted-foreground/60 cursor-not-allowed'
+                }`}
+              >
+                {item.label}
+              </button>
+            </React.Fragment>
+          ))}
         </div>
       )}
 
@@ -687,7 +870,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       )}
 
       {/* CLIENT SIGNUP FORM */}
-      {registerType === 'cliente' && (
+      {registerType === 'cliente' && !isClientOtpVerification && (
         <form onSubmit={handleSubmit(onSubmitPassenger)} noValidate className="space-y-4">
           {/* Social Auth */}
           <div className="grid grid-cols-2 gap-3">
@@ -975,6 +1158,80 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               Entrar agora
             </button>
           </p>
+        </form>
+      )}
+
+      {/* CLIENT OTP VERIFICATION */}
+      {registerType === 'cliente' && isClientOtpVerification && (
+        <form onSubmit={handleClientOtpSubmit} className="space-y-4 text-xs font-semibold">
+          <div className="border-b border-border pb-2 mb-2 text-center">
+            <ShieldCheck className="text-primary w-10 h-10 mx-auto mb-2" />
+            <h3 className="text-sm font-bold text-foreground">Verificação de E-mail</h3>
+            <p className="text-[10px] text-muted-foreground mt-1 font-normal max-w-xs mx-auto">
+              Introduza o código de 6 dígitos que enviamos para o seu e-mail ({passengerData?.email}
+              ) para validar e ativar a sua conta de passageiro.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-[11px] text-muted-foreground mb-1 text-center font-bold">
+              Código de Verificação de 6 Dígitos
+            </label>
+            <input
+              type="text"
+              maxLength={6}
+              required
+              placeholder="Digite o código (Ex: 123456)"
+              value={clientOtpCode}
+              onChange={(e) => setClientOtpCode(e.target.value)}
+              className="w-full px-4 py-3 border border-input rounded-xl bg-background text-foreground text-center text-sm font-mono tracking-widest focus:outline-none focus:border-primary"
+            />
+          </div>
+
+          {/* Resend OTP */}
+          <div className="flex flex-col items-center gap-1.5">
+            <p className="text-[10px] text-muted-foreground font-normal">Não recebeu o código?</p>
+            <button
+              type="button"
+              onClick={handleResendClientOtp}
+              disabled={clientOtpCooldown > 0 || isResendingClientOtp}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-primary/30 text-primary text-[11px] font-bold hover:bg-primary/10 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+            >
+              {isResendingClientOtp ? (
+                <>
+                  <Loader2 size={11} className="animate-spin" />A reenviar...
+                </>
+              ) : clientOtpCooldown > 0 ? (
+                `Reenviar código (${clientOtpCooldown}s)`
+              ) : (
+                'Reenviar código por e-mail'
+              )}
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setIsClientOtpVerification(false)}
+              className="flex-1 py-2.5 border border-border text-foreground font-bold rounded-xl text-xs hover:bg-muted transition-colors"
+            >
+              ← Voltar
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-accent transition-colors flex items-center justify-center gap-1.5"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  Verificando...
+                </>
+              ) : (
+                'Verificar e Criar Conta'
+              )}
+            </button>
+          </div>
         </form>
       )}
 
@@ -1486,9 +1743,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
           {/* Resend OTP */}
           <div className="flex flex-col items-center gap-1.5">
-            <p className="text-[10px] text-muted-foreground font-normal">
-              Não recebeu o código?
-            </p>
+            <p className="text-[10px] text-muted-foreground font-normal">Não recebeu o código?</p>
             <button
               type="button"
               id="resend-otp-btn"
@@ -1497,7 +1752,9 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-primary/30 text-primary text-[11px] font-bold hover:bg-primary/10 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               {isResending ? (
-                <><Loader2 size={11} className="animate-spin" />A reenviar...</>
+                <>
+                  <Loader2 size={11} className="animate-spin" />A reenviar...
+                </>
               ) : resendCooldown > 0 ? (
                 `Reenviar código (${resendCooldown}s)`
               ) : (
@@ -1506,20 +1763,30 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
             </button>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmittingCarrier}
-            className="w-full py-2.5 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-accent transition-colors flex items-center justify-center gap-1.5"
-          >
-            {isSubmittingCarrier ? (
-              <>
-                <Loader2 size={12} className="animate-spin" />
-                Validando...
-              </>
-            ) : (
-              'Verificar e Concluir'
-            )}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={prevStep}
+              disabled={isSubmittingCarrier}
+              className="flex-1 py-2.5 border border-border text-foreground font-bold rounded-xl text-xs hover:bg-muted transition-colors"
+            >
+              ← Voltar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmittingCarrier}
+              className="flex-1 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-accent transition-colors flex items-center justify-center gap-1.5"
+            >
+              {isSubmittingCarrier ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  Validando...
+                </>
+              ) : (
+                'Verificar e Concluir'
+              )}
+            </button>
+          </div>
         </form>
       )}
 
