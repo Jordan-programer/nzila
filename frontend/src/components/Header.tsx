@@ -9,6 +9,7 @@ import { Menu, X, User, LogIn, Bell, ArrowRight } from 'lucide-react';
 const navLinks = [
   { label: 'Início', href: '/', key: 'nav-home' },
   { label: 'Comprar Bilhete', href: '/results-page', key: 'nav-search' },
+  { label: 'Sobre Nós', href: '/sobre-nos', key: 'nav-about' },
 ];
 
 export default function Header() {

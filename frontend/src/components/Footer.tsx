@@ -6,7 +6,7 @@ import Icon from '@/components/ui/AppIcon';
 
 const footerLinks = {
   empresa: [
-    { label: 'Sobre Nós', href: '#', key: 'footer-sobre' },
+    { label: 'Sobre Nós', href: '/sobre-nos', key: 'footer-sobre' },
     { label: 'Como Funciona', href: '#como-funciona', key: 'footer-como' },
     { label: 'Parceiros', href: '#', key: 'footer-parceiros' },
     { label: 'Carreiras', href: '#', key: 'footer-carreiras' },

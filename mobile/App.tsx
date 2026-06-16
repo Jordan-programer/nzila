@@ -36,6 +36,8 @@ import {
   ArrowLeft,
   ChevronRight,
   TrendingUp,
+  Wifi,
+  WifiOff,
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -131,6 +133,51 @@ export default function App() {
   // Fiscal Scanning
   const [scanCode, setScanCode] = useState('');
   const [scanningResult, setScanningResult] = useState<{ status: 'VALID' | 'INVALID' | 'ALREADY_USED' | 'WRONG_CARRIER'; ticket?: any; error?: string } | null>(null);
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [offlineQueue, setOfflineQueue] = useState<string[]>([]);
+
+  const handleToggleOffline = () => {
+    if (offlineMode) {
+      if (offlineQueue.length > 0) {
+        setLoading(true);
+        toastMsg(`A sincronizar ${offlineQueue.length} validações locais pendentes...`);
+        syncOfflineQueue();
+      } else {
+        setOfflineMode(false);
+        toastMsg('Dispositivo Online!');
+      }
+    } else {
+      setOfflineMode(true);
+      toastMsg('Modo Offline ativado. Validações serão guardadas localmente.');
+    }
+  };
+
+  const syncOfflineQueue = async () => {
+    try {
+      let successCount = 0;
+      for (const code of offlineQueue) {
+        const res = await fetch(`${API_URL}/validation/confirm/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': currentUser?.token ? `Token ${currentUser.token}` : '',
+          },
+          body: JSON.stringify({ code, operator: currentUser?.name || 'Fiscal' }),
+        });
+        if (res.ok) {
+          successCount++;
+        }
+      }
+      toastMsg(`${successCount} validações sincronizadas com o servidor.`);
+      setOfflineQueue([]);
+      setOfflineMode(false);
+      loadFiscalBoardingList();
+    } catch (err) {
+      Alert.alert('Erro de Sincronização', 'Não foi possível enviar todas as validações ao servidor. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load reservations list from backend
   const loadMyTickets = async (sessionToken: string) => {
@@ -433,6 +480,46 @@ export default function App() {
     setLoading(true);
     setScanningResult(null);
 
+    if (offlineMode) {
+      setTimeout(() => {
+        setLoading(false);
+        const ticket = myTickets.find(t => 
+          (t.codigo_reserva && t.codigo_reserva.toLowerCase() === code.trim().toLowerCase()) ||
+          (t.qrToken && t.qrToken.toLowerCase() === code.trim().toLowerCase()) ||
+          String(t.id).toLowerCase() === code.trim().toLowerCase()
+        );
+
+        if (!ticket) {
+          setScanningResult({ 
+            status: 'INVALID', 
+            error: 'Bilhete não encontrado na cache local do manifesto.' 
+          });
+          return;
+        }
+
+        if (currentUser && currentUser.role === 'FISCAL') {
+          const fiscalCompany = currentUser.company_code || 'TRANSLUX';
+          if (ticket.carrierCode !== fiscalCompany) {
+            setScanningResult({ status: 'WRONG_CARRIER', ticket });
+            return;
+          }
+        }
+
+        if (ticket.status === 'CANCELADO') {
+          setScanningResult({ status: 'INVALID', error: 'Este bilhete está cancelado.', ticket });
+        } else if (ticket.status === 'EMBARCADO' || offlineQueue.includes(ticket.codigo_reserva)) {
+          setScanningResult({
+            status: 'ALREADY_USED',
+            error: 'Atenção: Este bilhete já foi validado anteriormente!',
+            ticket
+          });
+        } else {
+          setScanningResult({ status: 'VALID', ticket });
+        }
+      }, 500);
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/validation/scan/`, {
         method: 'POST',
@@ -472,6 +559,25 @@ export default function App() {
   };
 
   const handleConfirmBoarding = async (code: string) => {
+    if (offlineMode) {
+      if (!offlineQueue.includes(code)) {
+        setOfflineQueue([...offlineQueue, code]);
+      }
+      
+      const updatedTickets = myTickets.map(t => {
+        if (t.codigo_reserva === code) {
+          return { ...t, status: 'EMBARCADO' as const };
+        }
+        return t;
+      });
+      setMyTickets(updatedTickets);
+
+      toastMsg('Embarque registado localmente (offline)!');
+      setScanningResult(null);
+      setScanCode('');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(`${API_URL}/validation/confirm/`, {
@@ -993,7 +1099,10 @@ export default function App() {
 
                     <ScrollView showsVerticalScrollIndicator={false}>
                       <View style={styles.qrCodeContainer}>
-                        <QrCode size={180} color="#0f172a" />
+                        <Image
+                          source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(selectedTicket.qrToken || selectedTicket.codigo_reserva)}` }}
+                          style={{ width: 180, height: 180, borderRadius: 8 }}
+                        />
                         <Text style={styles.qrCodeTokenText}>{selectedTicket.codigo_reserva}</Text>
                       </View>
 
@@ -1120,15 +1229,45 @@ export default function App() {
               <View style={styles.fiscalBadgeIcon}>
                 <Shield size={16} color="#fff" />
               </View>
-              <View>
-                <Text style={styles.welcomeText}>Fiscal de Embarque ({currentUser?.company_code || 'TRANSLUX'})</Text>
-                <Text style={styles.userNameText}>{currentUser?.name}</Text>
+              <View style={{ maxWidth: 150 }}>
+                <Text style={styles.welcomeText} numberOfLines={1}>Fiscal ({currentUser?.company_code || 'TRANSLUX'})</Text>
+                <Text style={styles.userNameText} numberOfLines={1}>{currentUser?.name}</Text>
               </View>
             </View>
+
+            {/* Offline Switch */}
+            <TouchableOpacity
+              onPress={handleToggleOffline}
+              style={[
+                styles.offlineSwitchBtn,
+                offlineMode ? styles.offlineSwitchBtnActive : styles.offlineSwitchBtnInactive
+              ]}
+            >
+              {offlineMode ? (
+                <>
+                  <WifiOff size={12} color="#f43f5e" />
+                  <Text style={styles.offlineSwitchTextActive}>Offline</Text>
+                </>
+              ) : (
+                <>
+                  <Wifi size={12} color="#10b981" />
+                  <Text style={styles.offlineSwitchTextInactive}>Online</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
             <TouchableOpacity onPress={handleLogout} style={styles.logoutIconButton}>
               <LogOut size={20} color="#f43f5e" />
             </TouchableOpacity>
           </View>
+
+          {/* Offline pending warning ribbon */}
+          {offlineMode && (
+            <View style={styles.offlineWarningRibbon}>
+              <AlertCircle size={12} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.offlineWarningText}>Fila Offline: {offlineQueue.length} validações locais retidas</Text>
+            </View>
+          )}
 
           {/* Stats Tab */}
           {fiscalTab === 'STATS' && (
@@ -1183,17 +1322,53 @@ export default function App() {
             <View style={styles.scannerScreenContent}>
               {!scanningResult ? (
                 <View style={styles.cameraBoxMock}>
-                  <Camera size={48} color="#475569" />
+                  <Camera size={48} color="#475569" style={{ marginTop: 40 }} />
                   <Text style={styles.cameraLabelText}>A apontar câmara para o código QR...</Text>
-                  <View style={styles.scannerOverlayFrame} />
                   
-                  <View style={{position: 'absolute', bottom: 20, left: 16, right: 16}}>
+                  {/* Visual laser scanner line overlay */}
+                  <View style={styles.scannerOverlayFrame} />
+                  <View style={styles.laserScanLine} />
+
+                  <View style={{position: 'absolute', bottom: 16, left: 16, right: 16}}>
+                    <Text style={{color: '#94a3b8', fontSize: 10, fontWeight: 'bold', marginBottom: 6, textTransform: 'uppercase'}}>
+                      ⚡ Leitura Rápida (Clique para Simular):
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 10}} contentContainerStyle={{paddingRight: 20}}>
+                      {myTickets.map((t, idx) => (
+                        <TouchableOpacity
+                          key={idx}
+                          onPress={() => {
+                            setScanCode(t.codigo_reserva);
+                            handleValidateTicket(t.codigo_reserva);
+                          }}
+                          style={{
+                            backgroundColor: '#1e293b',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 10,
+                            marginRight: 8,
+                            borderWidth: 1,
+                            borderColor: t.status === 'EMBARCADO' ? '#10b98180' : '#334155',
+                          }}
+                        >
+                          <Text style={{color: t.status === 'EMBARCADO' ? '#10b981' : '#fff', fontSize: 11, fontWeight: 'bold'}}>
+                            {t.passenger_name.split(' ')[0]} ({t.seat})
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                      {myTickets.length === 0 && (
+                        <Text style={{color: '#64748b', fontSize: 11, fontStyle: 'italic', paddingVertical: 4}}>
+                          Nenhum bilhete no manifesto para hoje.
+                        </Text>
+                      )}
+                    </ScrollView>
+
                     <TextInput
                       value={scanCode}
                       onChangeText={setScanCode}
                       placeholder="Introduza Token QR de teste"
                       placeholderTextColor="#64748b"
-                      style={[styles.input, {backgroundColor: '#1e293b', marginBottom: 10}]}
+                      style={[styles.input, {backgroundColor: '#1e293b', marginBottom: 10, borderColor: '#334155'}]}
                     />
                     <TouchableOpacity
                       onPress={() => handleValidateTicket(scanCode)}
@@ -1293,7 +1468,15 @@ export default function App() {
                 <Text style={styles.emptyResultsText}>Nenhum passageiro agendado para hoje.</Text>
               ) : (
                 myTickets.map((t, idx) => (
-                  <View key={idx} style={styles.boardingListRow}>
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => {
+                      setFiscalTab('SCANNER');
+                      setScanCode(t.codigo_reserva);
+                      handleValidateTicket(t.codigo_reserva);
+                    }}
+                    style={styles.boardingListRow}
+                  >
                     <View style={{flex: 1, marginRight: 10}}>
                       <Text style={styles.boardingPassName}>{t.passenger_name}</Text>
                       <Text style={styles.boardingPassDetails}>Poltrona: {t.seat} | {t.origin} ➔ {t.destination}</Text>
@@ -1308,7 +1491,7 @@ export default function App() {
                         {t.status}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
             </ScrollView>
@@ -2243,5 +2426,56 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     paddingHorizontal: 12,
+  },
+  offlineSwitchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginRight: 8,
+  },
+  offlineSwitchBtnActive: {
+    backgroundColor: '#f43f5e15',
+    borderColor: '#f43f5e50',
+  },
+  offlineSwitchBtnInactive: {
+    backgroundColor: '#10b98115',
+    borderColor: '#10b98150',
+  },
+  offlineSwitchTextActive: {
+    color: '#f43f5e',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  offlineSwitchTextInactive: {
+    color: '#10b981',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  offlineWarningRibbon: {
+    flexDirection: 'row',
+    backgroundColor: '#d97706',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  offlineWarningText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  laserScanLine: {
+    position: 'absolute',
+    left: '15%',
+    right: '15%',
+    height: 2,
+    backgroundColor: '#10b981',
+    top: '38%',
+    opacity: 0.8,
   },
 });

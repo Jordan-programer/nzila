@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Nunito_Sans } from 'next/font/google';
-// import '../styles/tailwind.css';
+import '../styles/tailwind.css';
 import { Toaster } from 'sonner';
 
 const nunitoSans = Nunito_Sans({
@@ -29,7 +29,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="pt" className={nunitoSans.variable}>
       <head>
-        <link rel="stylesheet" href="/tailwind.css" />
       </head>
       <body className={nunitoSans.className}>
         {children}
