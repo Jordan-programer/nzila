@@ -28,8 +28,8 @@ const DEMO_ACCOUNTS = [
   },
   { email: 'admin@transbook.ao', name: 'Carlos Admin (Administrador)', role: 'admin', icon: '🔑' },
   {
-    email: 'fiscal@transbook.ao',
-    name: 'João Fiscal (Fiscal de Embarque)',
+    email: 'sttch58@gmail.com',
+    name: 'Sildio Evaristo (Fiscal de Embarque)',
     role: 'fiscal',
     icon: '🛡️',
   },
