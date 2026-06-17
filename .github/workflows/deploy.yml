@@ -19,6 +19,8 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: ${{ secrets.PORT || 22 }}
           script: |
+            sudo sh -c 'echo "client_max_body_size 10M;" > /etc/nginx/conf.d/client_max_body_size.conf'
+            sudo systemctl reload nginx
             cd /var/www/nzila
             git pull origin main
             ./deploy.sh

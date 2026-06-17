@@ -626,15 +626,24 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
       if (docEstatutos) docs.push({ tipo: 'ESTATUTOS', arquivo_url: docEstatutos });
 
       for (const d of docs) {
-        await fetch('/api/auth/upload-document/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            company_id: data.company_id,
-            tipo: d.tipo,
-            arquivo_url: d.arquivo_url,
-          }),
-        });
+        try {
+          const resDoc = await fetch('/api/auth/upload-document/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              company_id: data.company_id,
+              tipo: d.tipo,
+              arquivo_url: d.arquivo_url,
+            }),
+          });
+          if (!resDoc.ok) {
+            const errData = await resDoc.json().catch(() => ({}));
+            throw new Error(errData.error || `Erro HTTP ${resDoc.status} ao carregar o documento.`);
+          }
+        } catch (docErr: any) {
+          console.error(`Error uploading document ${d.tipo}:`, docErr);
+          toast.error(`Falha ao enviar documento "${d.tipo.replace('_', ' ')}": ${docErr.message || docErr}`);
+        }
       }
 
       // Set verification state
