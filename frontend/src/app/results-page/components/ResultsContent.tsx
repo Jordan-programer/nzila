@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 import SearchSummaryBar from './SearchSummaryBar';
 import FiltersPanel from './FiltersPanel';
 import TripCard from './TripCard';
 import ResultsHeader from './ResultsHeader';
-import { MOCK_TRIPS, Trip } from './mockTrips';
+import { Trip } from './mockTrips';
 
 export type SortOption = 'preco-asc' | 'preco-desc' | 'hora-asc' | 'hora-desc' | 'duracao-asc';
 
@@ -20,19 +22,52 @@ export interface FilterState {
 
 const INITIAL_FILTERS: FilterState = {
   priceMin: 0,
-  priceMax: 20000,
+  priceMax: 100000,
   horarios: [],
   classes: [],
   carriers: [],
 };
 
 export default function ResultsContent() {
+  const searchParams = useSearchParams();
+  const originQuery = searchParams.get('origem') || searchParams.get('origin') || '';
+  const destQuery = searchParams.get('destino') || searchParams.get('destination') || '';
+
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [sort, setSort] = useState<SortOption>('hora-asc');
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  useEffect(() => {
+    const fetchTrips = async () => {
+      setIsLoading(true);
+      try {
+        let url = 'http://localhost:8000/api/trips/';
+        const queryParams = new URLSearchParams();
+        if (originQuery) queryParams.append('origin', originQuery);
+        if (destQuery) queryParams.append('destination', destQuery);
+        
+        if (queryParams.toString()) {
+          url += `?${queryParams.toString()}`;
+        }
+        
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          setTrips(data);
+        }
+      } catch (err) {
+        console.error('Error fetching trips:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTrips();
+  }, [originQuery, destQuery]);
+
   const filteredAndSorted = useMemo<Trip[]>(() => {
-    let result = MOCK_TRIPS.filter((trip) => {
+    let result = trips.filter((trip) => {
       if (trip.price < filters.priceMin || trip.price > filters.priceMax) return false;
       if (filters.classes.length > 0 && !filters.classes.includes(trip.class)) return false;
       if (filters.carriers.length > 0 && !filters.carriers.includes(trip.carrier)) return false;
@@ -59,7 +94,22 @@ export default function ResultsContent() {
     });
 
     return result;
-  }, [filters, sort]);
+  }, [filters, sort, trips]);
+
+  if (isLoading) {
+    return (
+      <div className="bg-background min-h-screen flex flex-col">
+        <SearchSummaryBar />
+        <div className="flex-1 flex flex-col items-center justify-center py-20 text-center">
+          <Loader2 className="animate-spin rounded-full h-12 w-12 text-primary mb-4" />
+          <h3 className="text-base font-bold text-foreground">A carregar viagens...</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Por favor, aguarde enquanto consultamos a base de dados.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background min-h-screen">
@@ -69,7 +119,7 @@ export default function ResultsContent() {
         <div className="flex gap-6 lg:gap-8">
           {/* Filters Panel */}
           <aside className="hidden lg:block w-64 xl:w-72 flex-shrink-0">
-            <FiltersPanel filters={filters} setFilters={setFilters} trips={MOCK_TRIPS} />
+            <FiltersPanel filters={filters} setFilters={setFilters} trips={trips} />
           </aside>
 
           {/* Results Column */}
@@ -85,7 +135,7 @@ export default function ResultsContent() {
             {/* Mobile Filters Drawer */}
             {filtersOpen && (
               <div className="lg:hidden mb-4 bg-card border border-border rounded-2xl p-4 animate-slide-up">
-                <FiltersPanel filters={filters} setFilters={setFilters} trips={MOCK_TRIPS} />
+                <FiltersPanel filters={filters} setFilters={setFilters} trips={trips} />
               </div>
             )}
 

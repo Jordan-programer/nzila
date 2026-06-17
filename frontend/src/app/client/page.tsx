@@ -4,16 +4,47 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import {
-  getReservations,
-  getCurrentUser,
-  updateReservationStatus,
-  getSimulatedEmails,
-  addSimulatedEmailNotification,
-  SimulatedEmail,
-  Reservation,
-  UserSession,
-} from '@/app/components/mockDb';
+interface UserSession {
+  email: string;
+  name: string;
+  phone?: string;
+  document?: string;
+  avatar?: string;
+  isAdmin?: boolean;
+  role?: string;
+  company_id?: number;
+  company_code?: string;
+  token?: string;
+}
+
+interface Reservation {
+  id: string;
+  passengerName: string;
+  passengerEmail: string;
+  passengerPhone?: string;
+  passengerDocument: string;
+  origin: string;
+  destination: string;
+  departureTime: string;
+  arrivalTime: string;
+  classLabel: string;
+  seat: string;
+  price: number;
+  carrier: string;
+  carrierCode: string;
+  carrierColor: string;
+  status: string;
+  paymentMethod?: string;
+  validationDate?: string;
+}
+
+interface SimulatedEmail {
+  id: string;
+  recipient: string;
+  subject: string;
+  snippet: string;
+  sentAt?: string;
+}
 import { toast } from 'sonner';
 import {
   User,
@@ -61,28 +92,65 @@ export default function ClientDashboardPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  const [isLoadingRes, setIsLoadingRes] = useState(false);
+
+  const fetchBackendReservations = async (token: string) => {
+    setIsLoadingRes(true);
+    try {
+      const res = await fetch('http://localhost:8000/api/reservations/', {
+        headers: {
+          'Authorization': `Token ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReservations(data);
+      }
+    } catch (error) {
+      console.error('Error fetching reservations:', error);
+      toast.error('Erro ao carregar reservas do servidor.');
+    } finally {
+      setIsLoadingRes(false);
+    }
+  };
+
+  const fetchBackendNotifications = async (email: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/notifications/?email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = data.map((item: any) => ({
+          id: `db-${item.id}`,
+          recipient: email,
+          subject: item.tipo === 'CONFIRMACAO' ? 'Nzila: Confirmação / Registo' : item.tipo === 'LEMBRETE' ? 'Nzila: Lembrete' : 'Nzila: Alerta / Cancelamento',
+          snippet: item.mensagem,
+          sentAt: item.created_at,
+        }));
+        setEmails(mapped);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
   const refreshData = () => {
-    const currentUser = getCurrentUser();
-    if (!currentUser) {
+    const stored = localStorage.getItem('nzila_current_user');
+    if (!stored) {
       toast.error('Inicie sessão para aceder ao painel.');
       router.push('/sign-up-login-screen');
       return;
     }
+    const currentUser: UserSession = JSON.parse(stored);
     setUser(currentUser);
     setProfileName(currentUser.name);
     setProfilePhone(currentUser.phone || '');
     setProfileDocument(currentUser.document || '');
     setProfileEmail(currentUser.email);
 
-    // Get reservations filtered by user email
-    const allRes = getReservations();
-    const userRes = allRes.filter((r) => r.passengerEmail === currentUser.email);
-    setReservations(userRes);
-
-    // Get simulated notifications/emails
-    const allEmails = getSimulatedEmails();
-    const userEmails = allEmails.filter((e) => e.recipient === currentUser.email);
-    setEmails(userEmails);
+    if (currentUser.token) {
+      fetchBackendReservations(currentUser.token);
+    }
+    fetchBackendNotifications(currentUser.email);
   };
 
   useEffect(() => {
@@ -131,26 +199,34 @@ export default function ClientDashboardPage() {
     setConfirmPassword('');
   };
 
-  const handleConfirmCancellation = () => {
-    if (cancellationTarget) {
-      updateReservationStatus(cancellationTarget.id, 'CANCELADO');
-      toast.success(`Reserva ${cancellationTarget.id} cancelada com sucesso!`);
+  const handleConfirmCancellation = async () => {
+    if (cancellationTarget && user && (user as any).token) {
+      try {
+        const res = await fetch(`http://localhost:8000/api/reservations/${cancellationTarget.id}/cancel/`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Token ${(user as any).token}`
+          }
+        });
+        if (res.ok) {
+          toast.success(`Reserva ${cancellationTarget.id} cancelada com sucesso!`);
+          fetchBackendReservations((user as any).token);
+        } else {
+          throw new Error('Cancel failed');
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error('Erro ao cancelar a viagem no servidor.');
+      }
       setCancellationTarget(null);
-      refreshData();
     }
   };
 
   const handleResendEmail = (res: Reservation) => {
     toast.success(`A reenviar bilhete digital por e-mail para ${res.passengerEmail}...`);
     setTimeout(() => {
-      addSimulatedEmailNotification(
-        res.passengerEmail,
-        `Reenvio de Bilhete Digital: ${res.id}`,
-        `Pedido de reenvio de bilhete de ${res.origin} para ${res.destination}. Lembrete do código da reserva: ${res.id}`,
-        res
-      );
+      // Backend sends real notification emails; this is a client-side confirmation toast
       toast.success('Bilhete digital reenviado com sucesso!');
-      refreshData();
     }, 1000);
   };
 

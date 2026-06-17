@@ -3,12 +3,28 @@
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import {
-  getReservations,
-  updateReservationStatus,
-  getCurrentUser,
-  Reservation,
-} from '@/app/components/mockDb';
+
+interface Reservation {
+  id: string;
+  codigo_reserva: string;
+  origin: string;
+  destination: string;
+  passengerName: string;
+  passengerEmail: string;
+  passengerDocument: string;
+  seat: string;
+  classLabel: string;
+  departureTime: string;
+  arrivalTime: string;
+  carrier: string;
+  carrierCode: string;
+  carrierColor: string;
+  price: number;
+  paymentMethod: string;
+  status: string;
+  validationDate?: string;
+}
+
 import { toast } from 'sonner';
 import {
   QrCode,
@@ -41,7 +57,7 @@ interface LocalValidationLog {
 export default function MobileValidationApp() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [offlineMode, setOfflineMode] = useState(false);
-  const [offlineQueue, setOfflineQueue] = useState<string[]>([]); // Reservation IDs validated offline
+  const [offlineQueue, setOfflineQueue] = useState<string[]>([]); // Reservation codes validated offline
   const [validationHistory, setValidationHistory] = useState<LocalValidationLog[]>([]);
 
   // Scanning simulation states
@@ -57,29 +73,23 @@ export default function MobileValidationApp() {
   const [syncing, setSyncing] = useState(false);
   const [cameraSupported, setCameraSupported] = useState(true);
 
-  const loadReservations = () => {
-    setReservations(getReservations());
+  const loadReservations = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/reservations/');
+      if (res.ok) {
+        const data = await res.json();
+        setReservations(data);
+      } else {
+        console.warn('Não foi possível carregar reservas do servidor.');
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar reservas:', err);
+    }
   };
 
   useEffect(() => {
     loadReservations();
-    // Load initial validation history
-    setValidationHistory([
-      {
-        id: 'RES-LUA-HUA-20260601-M8Y2P1',
-        passengerName: 'Fátima Manuel',
-        route: 'LUA→HUA',
-        time: '05:48',
-        status: 'SUCESSO',
-      },
-      {
-        id: 'RES-LUA-HUA-20260601-A2B3C4',
-        passengerName: 'António Gouveia',
-        route: 'LUA→HUA',
-        time: '05:51',
-        status: 'SUCESSO',
-      },
-    ]);
+    // Start with empty validation history (session-based, not persisted)
 
     let scanner: any = null;
     let isScanningActive = true;
@@ -128,40 +138,48 @@ export default function MobileValidationApp() {
   }, []);
 
   // Handle offline sync transition
-  const handleToggleOffline = () => {
+  const handleToggleOffline = async () => {
     if (offlineMode) {
       // Transitioning from OFFLINE -> ONLINE
       if (offlineQueue.length > 0) {
         setSyncing(true);
         toast.info(`A sincronizar ${offlineQueue.length} validações locais pendentes...`);
 
-        setTimeout(() => {
-          setSyncing(false);
-          const currentRes = getReservations();
-          const nowStr = new Date().toLocaleTimeString('pt-AO', {
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-
-          // Flush offline validations to primary LocalStorage
-          offlineQueue.forEach((code) => {
-            updateReservationStatus(code, 'EMBARCADO', `${nowStr} (Sincronizado)`);
-          });
-
-          // Update validation history UI logs
-          const syncedLogs = validationHistory.map((log) => {
-            if (log.status === 'OFFLINE_PENDENTE') {
-              return { ...log, status: 'SUCESSO' as const };
+        let successCount = 0;
+        for (const code of offlineQueue) {
+          try {
+            const res = await fetch('http://localhost:8000/api/validation/confirm/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code }),
+            });
+            if (res.ok) {
+              successCount++;
             }
-            return log;
-          });
+          } catch (err) {
+            console.warn(`Erro ao sincronizar validação ${code}:`, err);
+          }
+        }
 
-          setValidationHistory(syncedLogs);
-          setOfflineQueue([]);
-          setOfflineMode(false);
-          toast.success('Validações sincronizadas e banco de dados centralizado atualizado!');
-          loadReservations();
-        }, 2200);
+        const nowStr = new Date().toLocaleTimeString('pt-AO', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        // Update validation history UI logs
+        const syncedLogs = validationHistory.map((log) => {
+          if (log.status === 'OFFLINE_PENDENTE') {
+            return { ...log, status: 'SUCESSO' as const };
+          }
+          return log;
+        });
+
+        setSyncing(false);
+        setValidationHistory(syncedLogs);
+        setOfflineQueue([]);
+        setOfflineMode(false);
+        toast.success(`${successCount} validação(ões) sincronizada(s) com o servidor central!`);
+        await loadReservations();
       } else {
         setOfflineMode(false);
         toast.success('Dispositivo Online!');
@@ -173,52 +191,87 @@ export default function MobileValidationApp() {
     }
   };
 
-  const handleScanCode = (code: string) => {
+  const handleScanCode = async (code: string) => {
     if (!code) return;
     setScanning(true);
     setResultStatus('NONE');
     setResultTicket(null);
 
-    setTimeout(() => {
-      setScanning(false);
-      const ticket = reservations.find((r) => r.id.toLowerCase() === code.trim().toLowerCase());
+    if (offlineMode) {
+      // In offline mode: look up from cached reservations list
+      setTimeout(() => {
+        setScanning(false);
+        const ticket = reservations.find(
+          (r) =>
+            r.id.toLowerCase() === code.trim().toLowerCase() ||
+            r.codigo_reserva.toLowerCase() === code.trim().toLowerCase()
+        );
 
-      if (!ticket) {
+        if (!ticket) {
+          setResultStatus('INVALID');
+          toast.error('Código inválido ou inexistente.');
+          return;
+        }
+
+        setResultTicket(ticket);
+
+        if (ticket.status === 'CANCELADA') {
+          setResultStatus('INVALID');
+        } else if (
+          ticket.status === 'UTILIZADO' ||
+          ticket.status === 'EMBARCADO' ||
+          offlineQueue.includes(ticket.id)
+        ) {
+          setResultStatus('USED');
+        } else {
+          setResultStatus('VALID');
+        }
+      }, 600);
+      return;
+    }
+
+    // Online mode: call the backend scan API
+    try {
+      const res = await fetch('http://localhost:8000/api/validation/scan/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim() }),
+      });
+
+      setScanning(false);
+
+      if (!res.ok) {
         setResultStatus('INVALID');
-        toast.error('Código inválido ou inexistente.');
+        toast.error('Falha de comunicação com o servidor.');
         return;
       }
 
+      const resData = await res.json();
+
+      if (resData.status === 'INVALID') {
+        setResultStatus('INVALID');
+        toast.error(resData.error || 'Bilhete Inválido: Código não encontrado!');
+        return;
+      }
+
+      const ticket = resData.ticket;
       setResultTicket(ticket);
 
-      // Verificar se o utilizador atual é um fiscal e se o bilhete pertence à sua transportadora
-      const currentUser = getCurrentUser();
-      if (currentUser && (currentUser.role === 'fiscal' || currentUser.role === 'FISCAL')) {
-        const fiscalCompany = currentUser.company_code || 'TRANSLUX'; // Default to TRANSLUX
-        if (ticket.carrierCode !== fiscalCompany) {
-          setResultStatus('WRONG_CARRIER');
-          toast.error(
-            `Acesso Negado: Como fiscal da ${fiscalCompany}, não pode validar bilhetes da ${ticket.carrier || ticket.carrierCode}!`
-          );
-          return;
-        }
-      }
-
-      if (ticket.status === 'CANCELADO') {
-        setResultStatus('INVALID');
-      } else if (
-        ticket.status === 'UTILIZADO' ||
-        ticket.status === 'EMBARCADO' ||
-        offlineQueue.includes(ticket.id)
-      ) {
+      if (resData.status === 'ALREADY_USED') {
         setResultStatus('USED');
+        toast.warning('Atenção: Este bilhete já foi validado anteriormente!');
       } else {
         setResultStatus('VALID');
+        toast.success('Bilhete Válido! Pronto para o embarque.');
       }
-    }, 800);
+    } catch (err: any) {
+      setScanning(false);
+      setResultStatus('INVALID');
+      toast.error(err.message || 'Erro ao validar o bilhete.');
+    }
   };
 
-  const handleConfirmMobileBoarding = () => {
+  const handleConfirmMobileBoarding = async () => {
     if (resultTicket && resultStatus === 'VALID') {
       const nowStr = new Date().toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' });
 
@@ -231,20 +284,34 @@ export default function MobileValidationApp() {
       };
 
       if (offlineMode) {
-        // Cached locally in queue
+        // Cache locally in queue (use the reservation code for later sync)
         setOfflineQueue([...offlineQueue, resultTicket.id]);
+        setValidationHistory([newHistoryLog, ...validationHistory]);
         toast.info('Embarque registado no cache local offline!');
+        setResultStatus('USED');
       } else {
-        // Direct API update
-        updateReservationStatus(resultTicket.id, 'EMBARCADO', `${nowStr} (Fiscal Móvel)`);
-        toast.success('Embarque confirmado via central online!');
-        loadReservations();
+        // Direct API confirmation
+        try {
+          const res = await fetch('http://localhost:8000/api/validation/confirm/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: resultTicket.id }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.error || 'Erro ao confirmar o embarque.');
+          }
+
+          const resData = await res.json();
+          toast.success(`Embarque confirmado via central online para ${resultTicket.passengerName}!`);
+          setValidationHistory([newHistoryLog, ...validationHistory]);
+          setResultStatus('USED');
+          await loadReservations();
+        } catch (err: any) {
+          toast.error(err.message || 'Erro de ligação ao servidor.');
+        }
       }
-
-      setValidationHistory([newHistoryLog, ...validationHistory]);
-
-      // Update result state to show as utilized immediately
-      setResultStatus('USED');
     }
   };
 
@@ -273,14 +340,14 @@ export default function MobileValidationApp() {
               <Loader2 className="animate-spin text-primary w-12 h-12 mb-4" />
               <h4 className="font-bold text-sm text-foreground">Sincronização Ativa</h4>
               <p className="text-xs text-muted-foreground mt-1">
-                A enviar dados locais de validação para o Painel Central da Macon e Translux...
+                A enviar dados locais de validação para o servidor central Nzila...
               </p>
             </div>
           )}
 
           {/* Phone Header Status Bar */}
           <div className="h-10 bg-slate-100 flex items-end justify-between px-6 pb-2 text-[10px] font-black text-foreground border-b border-border z-20">
-            <span className="tabular-nums">19:38</span>
+            <span className="tabular-nums">{new Date().toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' })}</span>
             <div className="flex items-center gap-1.5">
               {offlineMode ? (
                 <WifiOff size={11} className="text-danger" />
@@ -372,7 +439,7 @@ export default function MobileValidationApp() {
                         </option>
                         {reservations.map((r) => (
                           <option key={`mob-opt-${r.id}`} value={r.id}>
-                            {r.passengerName.split(' ')[0]} → {r.destination.substring(0, 3)} (
+                            {r.passengerName?.split(' ')[0] || 'Passageiro'} → {r.destination?.substring(0, 3) || '---'} (
                             {r.status})
                           </option>
                         ))}
@@ -443,7 +510,7 @@ export default function MobileValidationApp() {
                     <div className="p-4 space-y-4 text-xs font-bold flex-1">
                       <div className="flex items-center gap-2 border-b border-border/60 pb-2.5">
                         <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-black">
-                          {resultTicket.passengerName.charAt(0)}
+                          {resultTicket.passengerName?.charAt(0) || '?'}
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-bold text-foreground truncate">
@@ -474,20 +541,11 @@ export default function MobileValidationApp() {
                           <span className="text-muted-foreground font-medium">Código:</span>
                           <span className="text-primary font-mono">{resultTicket.id}</span>
                         </div>
-                      </div>
-
-                      {/* Wrong carrier warning */}
-                      {resultStatus === 'WRONG_CARRIER' && (
-                        <div className="p-2 bg-danger/5 border border-danger/25 rounded-xl flex gap-1 text-[9px] text-danger leading-relaxed font-semibold">
-                          <AlertTriangle size={12} className="text-danger flex-shrink-0 mt-0.5" />
-                          <span>
-                            Acesso Negado: Este bilhete é da operadora{' '}
-                            <strong>{resultTicket.carrier}</strong>. Como fiscal da{' '}
-                            <strong>{getCurrentUser()?.company_code || 'TRANSLUX'}</strong>, apenas
-                            tem autorização para validar bilhetes da sua própria transportadora.
-                          </span>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground font-medium">Transportadora:</span>
+                          <span className="text-foreground">{resultTicket.carrier}</span>
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Trigger Actions */}
@@ -511,6 +569,28 @@ export default function MobileValidationApp() {
                           Voltar ao Leitor
                         </button>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* INVALID result with no ticket */}
+                {resultStatus === 'INVALID' && !scanning && !resultTicket && (
+                  <div className="bg-card border border-danger/30 rounded-2xl overflow-hidden shadow-sm animate-fade-in">
+                    <div className="bg-danger/15 p-2.5 text-center text-danger flex items-center justify-center gap-1.5 font-black text-[10px] uppercase">
+                      <XCircle size={14} />
+                      <span>❌ Bilhete Inválido ou Não Encontrado</span>
+                    </div>
+                    <div className="p-3">
+                      <button
+                        onClick={() => {
+                          setResultStatus('NONE');
+                          setResultTicket(null);
+                          setScanCode('');
+                        }}
+                        className="w-full py-2 border border-border bg-card rounded-xl text-xs font-bold hover:bg-muted text-muted-foreground"
+                      >
+                        Voltar ao Leitor
+                      </button>
                     </div>
                   </div>
                 )}

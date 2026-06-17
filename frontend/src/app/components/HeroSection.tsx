@@ -75,9 +75,9 @@ export default function HeroSection() {
 
   return (
     <section
-      className="relative min-h-[580px] lg:min-h-[640px] hero-pattern flex items-center pt-24 lg:pt-28"
+      className="relative min-h-[580px] lg:min-h-[640px] flex items-center pt-24 lg:pt-28 bg-cover bg-center bg-no-repeat"
       style={{
-        background: 'linear-gradient(135deg, #059669 0%, #047857 40%, #064E3B 100%)',
+        backgroundImage: `linear-gradient(135deg, rgba(5, 150, 105, 0.65) 0%, rgba(4, 120, 87, 0.7) 40%, rgba(6, 78, 59, 0.8) 100%), url('/assets/hero/hero-nzila.jpg')`,
       }}
     >
       {/* Background decoration */}

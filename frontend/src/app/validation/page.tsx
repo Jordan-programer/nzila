@@ -3,12 +3,28 @@
 import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import {
-  getReservations,
-  updateReservationStatus,
-  getCurrentUser,
-  Reservation,
-} from '@/app/components/mockDb';
+
+
+interface Reservation {
+  id: string;
+  codigo_reserva: string;
+  origin: string;
+  destination: string;
+  passengerName: string;
+  passengerEmail: string;
+  passengerDocument: string;
+  seat: string;
+  classLabel: string;
+  departureTime: string;
+  arrivalTime: string;
+  carrier: string;
+  carrierCode: string;
+  carrierColor: string;
+  price: number;
+  paymentMethod: string;
+  status: string;
+  validationDate?: string;
+}
 import { toast } from 'sonner';
 import {
   QrCode,
@@ -26,7 +42,6 @@ import {
 } from 'lucide-react';
 
 export default function TicketValidationPage() {
-  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [inputCode, setInputCode] = useState('');
 
   // Scanned Ticket result
@@ -37,13 +52,7 @@ export default function TicketValidationPage() {
   const [scanning, setScanning] = useState(false);
   const [cameraSupported, setCameraSupported] = useState(true);
 
-  const loadReservations = () => {
-    setReservations(getReservations());
-  };
-
   useEffect(() => {
-    loadReservations();
-
     let scanner: any = null;
     let isScanningActive = true;
 
@@ -91,33 +100,41 @@ export default function TicketValidationPage() {
     };
   }, []);
 
-  const handleValidate = (codeToValidate: string) => {
+  const handleValidate = async (codeToValidate: string) => {
     if (!codeToValidate.trim()) return;
 
     setScanning(true);
     setValidationResult('NONE');
     setScannedTicket(null);
 
-    // Simulate camera/scanner delay
-    setTimeout(() => {
-      setScanning(false);
-      const resList = getReservations();
-      const ticket = resList.find(
-        (r) => r.id.toLowerCase() === codeToValidate.trim().toLowerCase()
-      );
+    try {
+      const res = await fetch('http://localhost:8000/api/validation/scan/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: codeToValidate.trim() }),
+      });
 
-      if (!ticket) {
+      if (!res.ok) {
+        throw new Error('Falha de comunicação com o servidor.');
+      }
+
+      const resData = await res.json();
+      setScanning(false);
+
+      if (resData.status === 'INVALID') {
         setValidationResult('INVALID');
-        toast.error('Bilhete Inválido: Código não encontrado!');
+        toast.error(resData.error || 'Bilhete Inválido: Código não encontrado!');
         return;
       }
 
+      const ticket = resData.ticket;
       setScannedTicket(ticket);
 
       // Verificar se o utilizador atual é um fiscal e se o bilhete pertence à sua transportadora
-      const currentUser = getCurrentUser();
+      const stored = localStorage.getItem('nzila_current_user');
+      const currentUser = stored ? JSON.parse(stored) : null;
       if (currentUser && (currentUser.role === 'fiscal' || currentUser.role === 'FISCAL')) {
-        const fiscalCompany = currentUser.company_code || 'TRANSLUX'; // Default to TRANSLUX
+        const fiscalCompany = currentUser.company_code || 'TRANSLUX';
         if (ticket.carrierCode !== fiscalCompany) {
           setValidationResult('WRONG_CARRIER');
           toast.error(
@@ -127,36 +144,43 @@ export default function TicketValidationPage() {
         }
       }
 
-      if (ticket.status === 'CANCELADO') {
-        setValidationResult('INVALID');
-        toast.error('Bilhete Inválido: Esta reserva foi cancelada!');
-      } else if (ticket.status === 'UTILIZADO' || ticket.status === 'EMBARCADO') {
+      if (resData.status === 'ALREADY_USED') {
         setValidationResult('ALREADY_USED');
         toast.warning('Atenção: Este bilhete já foi validado anteriormente!');
       } else {
         setValidationResult('VALID');
         toast.success('Bilhete Válido! Pronto para o embarque.');
       }
-    }, 1000);
+    } catch (err: any) {
+      setScanning(false);
+      setValidationResult('INVALID');
+      toast.error(err.message || 'Erro ao validar o bilhete.');
+    }
   };
 
-  const handleConfirmBoarding = () => {
+  const handleConfirmBoarding = async () => {
     if (scannedTicket && validationResult === 'VALID') {
-      const nowStr =
-        new Date().toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' }) +
-        ' ' +
-        new Date().toLocaleDateString('pt-AO');
+      try {
+        const res = await fetch('http://localhost:8000/api/validation/confirm/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: scannedTicket.id }),
+        });
 
-      // Update DB to EMBARCADO / UTILIZADO
-      updateReservationStatus(scannedTicket.id, 'EMBARCADO', nowStr);
-      toast.success(`Embarque confirmado com sucesso para ${scannedTicket.passengerName}!`);
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Erro ao confirmar o embarque.');
+        }
 
-      // Update local state to mimic "already used" upon check-in
-      const updated = { ...scannedTicket, status: 'EMBARCADO' as const, validationDate: nowStr };
-      setScannedTicket(updated);
-      setValidationResult('ALREADY_USED');
+        const resData = await res.json();
+        toast.success(`Embarque confirmado com sucesso para ${scannedTicket.passengerName}!`);
 
-      loadReservations();
+        const updated = resData.ticket;
+        setScannedTicket(updated);
+        setValidationResult('ALREADY_USED');
+      } catch (err: any) {
+        toast.error(err.message || 'Erro de ligação ao servidor.');
+      }
     }
   };
 
@@ -364,7 +388,7 @@ export default function TicketValidationPage() {
                           <strong className="underline">{scannedTicket.carrier}</strong>.<br />
                           Como fiscal da{' '}
                           <strong className="underline">
-                            {getCurrentUser()?.company_code || 'TRANSLUX'}
+                            {(() => { const s = localStorage.getItem('nzila_current_user'); const u = s ? JSON.parse(s) : null; return u?.company_code || 'TRANSLUX'; })()}
                           </strong>
                           , apenas tem autorização para confirmar embarques da sua própria
                           transportadora.

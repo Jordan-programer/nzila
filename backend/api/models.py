@@ -132,7 +132,12 @@ class Route(models.Model):
 class Bus(models.Model):
     empresa = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='buses')
     modelo = models.CharField(max_length=100)
+    matricula = models.CharField(max_length=30, blank=True, null=True)
     capacidade = models.IntegerField()
+    # Layout do autocarro: colunas à esquerda e direita do corredor, e nº de fileiras
+    colunas_esquerda = models.IntegerField(default=2)
+    colunas_direita = models.IntegerField(default=2)
+    linhas = models.IntegerField(default=11)
 
     class Meta:
         db_table = 'buses'

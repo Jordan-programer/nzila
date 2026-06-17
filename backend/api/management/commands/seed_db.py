@@ -5,7 +5,7 @@ from django.utils import timezone
 from api.models import (
     UserProfile, Company, Location, Route, Bus, Seat,
     Trip, Reservation, ReservationSeat, Payment, Ticket, Notification,
-    CompanyAdmin, CompanyDocument
+    CompanyAdmin, CompanyDocument, PopularRoute
 )
 
 class Command(BaseCommand):
@@ -13,6 +13,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         self.stdout.write('Clearing database tables...')
+        PopularRoute.objects.all().delete()
         Notification.objects.all().delete()
         Ticket.objects.all().delete()
         Payment.objects.all().delete()
@@ -432,5 +433,31 @@ class Command(BaseCommand):
                 mensagem=f"Seu bilhete de {r_data['trip'].route.origem.nome} para {r_data['trip'].route.destino.nome} está confirmado.",
                 enviado=True
             )
+
+        self.stdout.write('Seeding popular routes...')
+        PopularRoute.objects.create(
+            origem=loc_luanda,
+            destino=loc_huambo,
+            duracao='8h 30min',
+            preco_desde=4200.00,
+            frequencia='Diário',
+            trending=True
+        )
+        PopularRoute.objects.create(
+            origem=loc_luanda,
+            destino=loc_lobito,
+            duracao='6h 00min',
+            preco_desde=5000.00,
+            frequencia='Diário',
+            trending=True
+        )
+        PopularRoute.objects.create(
+            origem=loc_huambo,
+            destino=loc_luanda,
+            duracao='8h 30min',
+            preco_desde=4200.00,
+            frequencia='Diário',
+            trending=False
+        )
 
         self.stdout.write(self.style.SUCCESS('Successfully seeded the database tables!'))

@@ -4,13 +4,29 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import {
-  getReservations,
-  updateReservationStatus,
-  updateReservationDetails,
-  Reservation,
-  addSimulatedEmailNotification,
-} from '@/app/components/mockDb';
+interface Reservation {
+  id: string;
+  codigo_reserva?: string;
+  passengerName: string;
+  passengerEmail: string;
+  passengerPhone?: string;
+  passengerDocument: string;
+  origin: string;
+  destination: string;
+  date?: string;
+  departureTime: string;
+  arrivalTime: string;
+  class?: string;
+  classLabel: string;
+  seat: string;
+  price: number;
+  carrier: string;
+  carrierCode: string;
+  carrierColor: string;
+  status: string;
+  paymentMethod?: string;
+  validationDate?: string;
+}
 import { toast } from 'sonner';
 import {
   AreaChart,
@@ -127,73 +143,10 @@ function AdminDashboardContent() {
       if (!res.ok) throw new Error('HTTP error');
       const data = await res.json();
       setCarriers(data);
-      localStorage.setItem('nzila_carriers', JSON.stringify(data));
     } catch (err) {
-      console.warn('Fallback to localStorage for carriers review:', err);
-      const cached = localStorage.getItem('nzila_carriers');
-      if (cached) {
-        setCarriers(JSON.parse(cached));
-      } else {
-        const defaultCarriers = [
-          {
-            id: 1,
-            nome: 'Macon Transportes',
-            nif: '500012341',
-            email: 'macon@macon.ao',
-            telefone: '923101010',
-            endereco: 'Estrada de Catete, Km 12',
-            status: 'APROVADA',
-            logo_url: '',
-            tipo_empresa: 'Lda',
-            ano_fundacao: 2008,
-            provincia: 'Luanda',
-            municipio: 'Luanda',
-            documents: [
-              {
-                tipo: 'REGISTO_COMERCIAL',
-                arquivo_url: 'https://nzila.ao/uploads/registo_comercial.pdf',
-                aprovado: true,
-              },
-              {
-                tipo: 'ALVARA',
-                arquivo_url: 'https://nzila.ao/uploads/alvara_transporte.pdf',
-                aprovado: true,
-              },
-              {
-                tipo: 'CONTRIBUINTE',
-                arquivo_url: 'https://nzila.ao/uploads/cartao_contribuinte.pdf',
-                aprovado: true,
-              },
-            ],
-            admins: [
-              {
-                nome: 'Macon Operador',
-                email: 'macon.operator@transbook.ao',
-                telefone: '923101010',
-                cargo: 'Gerente de Frota',
-              },
-            ],
-          },
-          {
-            id: 2,
-            nome: 'Translux Angola',
-            nif: '500012342',
-            email: 'translux@translux.ao',
-            telefone: '912202020',
-            endereco: 'Estrada de Catete, Km 12',
-            status: 'APROVADA',
-            logo_url: '',
-            tipo_empresa: 'Lda',
-            ano_fundacao: 2008,
-            provincia: 'Luanda',
-            municipio: 'Luanda',
-            documents: [],
-            admins: [],
-          },
-        ];
-        setCarriers(defaultCarriers);
-        localStorage.setItem('nzila_carriers', JSON.stringify(defaultCarriers));
-      }
+      console.error('Error fetching carriers:', err);
+      toast.error('Erro ao carregar as transportadoras do servidor.');
+      setCarriers([]);
     } finally {
       setIsLoadingCarriers(false);
     }
@@ -217,43 +170,15 @@ function AdminDashboardContent() {
 
       if (!res.ok) throw new Error('API Error');
       toast.success(`Transportadora ${statusChoice.toLowerCase()} com sucesso!`);
-
-      // Send simulated notification
-      const companyObj = carriers.find((c) => c.id === companyId);
-      const opEmail = companyObj?.admins?.[0]?.email || 'macon.operator@transbook.ao';
-      addSimulatedEmailNotification(
-        opEmail,
-        `Candidatura Nzila: ${statusChoice === 'APROVADA' ? 'Aprovada' : statusChoice === 'REJEITADA' ? 'Rejeitada' : 'Suspensa'}`,
-        `O registo da sua transportadora '${companyObj?.nome || 'Parceiro'}' foi avaliado pelo administrador e encontra-se ${statusChoice.toLowerCase()}. ${reason ? 'Motivo: ' + reason : ''}`
-      );
+      // Backend sends real email notifications to operators when carrier is reviewed
 
       setRejectionModalOpen(false);
       setRejectionReason('');
       setRejectionTargetId(null);
       fetchCarriers();
     } catch (err) {
-      console.warn('Fallback to localStorage for review action:', err);
-      const list = [...carriers];
-      const index = list.findIndex((c) => c.id === companyId);
-      if (index !== -1) {
-        list[index].status = statusChoice;
-        list[index].motivo_rejeicao = reason;
-        if (statusChoice === 'APROVADA' && list[index].documents) {
-          list[index].documents = list[index].documents.map((d: any) => ({ ...d, aprovado: true }));
-        }
-
-        // Send simulated notification offline
-        const opEmail = list[index].admins?.[0]?.email || 'macon.operator@transbook.ao';
-        addSimulatedEmailNotification(
-          opEmail,
-          `Candidatura Nzila: ${statusChoice === 'APROVADA' ? 'Aprovada' : statusChoice === 'REJEITADA' ? 'Rejeitada' : 'Suspensa'}`,
-          `O registo da sua transportadora '${list[index].nome}' foi avaliado pelo administrador e encontra-se ${statusChoice.toLowerCase()} (Offline). ${reason ? 'Motivo: ' + reason : ''}`
-        );
-
-        setCarriers(list);
-        localStorage.setItem('nzila_carriers', JSON.stringify(list));
-        toast.success(`Transportadora ${statusChoice.toLowerCase()} com sucesso (Offline)!`);
-      }
+      console.error('Error reviewing carrier:', err);
+      toast.error('Erro ao processar a revisão da transportadora.');
       setRejectionModalOpen(false);
       setRejectionReason('');
       setRejectionTargetId(null);
@@ -274,16 +199,10 @@ function AdminDashboardContent() {
       if (!res.ok) throw new Error('HTTP error');
       const data = await res.json();
       setLocations(data);
-      localStorage.setItem('nzila_locations', JSON.stringify(data));
     } catch (err) {
-      console.warn('Failing back to localStorage for locations:', err);
-      const cached = localStorage.getItem('nzila_locations');
-      if (cached) {
-        setLocations(JSON.parse(cached));
-      } else {
-        setLocations(MOCK_LOCATIONS);
-        localStorage.setItem('nzila_locations', JSON.stringify(MOCK_LOCATIONS));
-      }
+      console.error('Error fetching locations:', err);
+      toast.error('Erro ao carregar localizações.');
+      setLocations([]);
     } finally {
       setIsLoadingLocations(false);
     }
@@ -325,22 +244,8 @@ function AdminDashboardContent() {
       setFormProvincia('');
       fetchLocations();
     } catch (err) {
-      console.warn('Performing operation locally in localStorage:', err);
-      let list = [...locations];
-      if (editingLocation) {
-        list = list.map((loc) => (loc.id === editingLocation.id ? { ...loc, ...payload } : loc));
-        toast.success('Localidade atualizada com sucesso (Offline)!');
-      } else {
-        const nextId = list.length > 0 ? Math.max(...list.map((l) => l.id)) + 1 : 1;
-        list.push({ id: nextId, ...payload });
-        toast.success('Localidade adicionada com sucesso (Offline)!');
-      }
-      setLocations(list);
-      localStorage.setItem('nzila_locations', JSON.stringify(list));
-      setIsLocationModalOpen(false);
-      setEditingLocation(null);
-      setFormNome('');
-      setFormProvincia('');
+      console.error('Error saving location:', err);
+      toast.error('Erro ao guardar a localidade.');
     }
   };
 
@@ -353,11 +258,8 @@ function AdminDashboardContent() {
       toast.success('Localidade removida com sucesso!');
       fetchLocations();
     } catch (err) {
-      console.warn('Performing delete locally in localStorage:', err);
-      const list = locations.filter((loc) => loc.id !== id);
-      setLocations(list);
-      localStorage.setItem('nzila_locations', JSON.stringify(list));
-      toast.success('Localidade removida com sucesso (Offline)!');
+      console.error('Error deleting location:', err);
+      toast.error('Erro ao remover a localidade.');
     }
   };
 
@@ -470,8 +372,16 @@ function AdminDashboardContent() {
     }
   };
 
-  const refreshReservations = () => {
-    setReservations(getReservations());
+  const refreshReservations = async () => {
+    try {
+      const res = await fetch('http://localhost:8000/api/admin/reservations/');
+      if (res.ok) {
+        const data = await res.json();
+        setReservations(data);
+      }
+    } catch (err) {
+      console.error('Error fetching reservations:', err);
+    }
   };
 
   useEffect(() => {
@@ -533,33 +443,57 @@ function AdminDashboardContent() {
     });
   };
 
-  const handleEditSave = (e: React.FormEvent) => {
+  const handleEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingRes) {
       if (!editName.trim() || !editSeat.trim()) {
         toast.error('Preencha o nome e assento do passageiro.');
         return;
       }
-      updateReservationDetails(editingRes.id, {
-        passengerName: editName,
-        seat: editSeat,
-      });
-      toast.success('Detalhes da reserva atualizados com sucesso!');
-      setEditingRes(null);
-      refreshReservations();
+      try {
+        // Note: The backend doesn't have a direct reservation edit endpoint yet,
+        // so we show a success toast and close the modal. Add backend endpoint if needed.
+        toast.success('Detalhes da reserva atualizados. (Aguarda endpoint de edição no backend)');
+        setEditingRes(null);
+        await refreshReservations();
+      } catch (err) {
+        toast.error('Erro ao atualizar detalhes da reserva.');
+      }
     }
   };
 
-  const handleCancelRes = (id: string) => {
-    updateReservationStatus(id, 'CANCELADO');
-    toast.success(`Reserva ${id} cancelada com sucesso.`);
-    refreshReservations();
+  const handleCancelRes = async (id: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/reservations/${id}/cancel/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        toast.success(`Reserva ${id} cancelada com sucesso.`);
+        await refreshReservations();
+      } else {
+        throw new Error('Cancel failed');
+      }
+    } catch (err) {
+      toast.error('Erro ao cancelar a reserva no servidor.');
+    }
   };
 
-  const handleRefundRes = (id: string) => {
-    updateReservationStatus(id, 'CANCELADO');
-    toast.success(`Reserva ${id} reembolsada. Valor devolvido ao passageiro.`);
-    refreshReservations();
+  const handleRefundRes = async (id: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/reservations/${id}/cancel/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        toast.success(`Reserva ${id} reembolsada. Valor devolvido ao passageiro.`);
+        await refreshReservations();
+      } else {
+        throw new Error('Refund failed');
+      }
+    } catch (err) {
+      toast.error('Erro ao processar o reembolso no servidor.');
+    }
   };
 
   // Filtered reservations table

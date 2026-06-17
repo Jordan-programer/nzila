@@ -40,8 +40,23 @@ interface UserSession {
 interface Bus {
   id: number;
   modelo: string;
+  matricula?: string;
   capacidade: number;
   empresa: number;
+  colunas_esquerda: number;
+  colunas_direita: number;
+  linhas: number;
+}
+
+interface Fiscal {
+  id: number;
+  user_id: number;
+  nome: string;
+  email: string;
+  telefone?: string;
+  document?: string;
+  company_id: number;
+  role: string;
 }
 
 interface Location {
@@ -89,7 +104,7 @@ export default function OperatorDashboardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [company, setCompany] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'frota' | 'rotas' | 'viagens' | 'perfil'>('frota');
+  const [activeTab, setActiveTab] = useState<'frota' | 'rotas' | 'viagens' | 'fiscais' | 'perfil'>('frota');
 
   // Loading States
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -104,7 +119,21 @@ export default function OperatorDashboardPage() {
   // Form Modals / Forms States
   const [isBusModalOpen, setIsBusModalOpen] = useState(false);
   const [busModel, setBusModel] = useState('');
-  const [busCapacity, setBusCapacity] = useState('44');
+  const [busMatricula, setBusMatricula] = useState('');
+  const [busColEsq, setBusColEsq] = useState(2);
+  const [busColDir, setBusColDir] = useState(2);
+  const [busLinhas, setBusLinhas] = useState(11);
+  const busCapacidade = (busColEsq + busColDir) * busLinhas;
+
+  // Fiscais state
+  const [fiscais, setFiscais] = useState<Fiscal[]>([]);
+  const [isFiscalModalOpen, setIsFiscalModalOpen] = useState(false);
+  const [editingFiscal, setEditingFiscal] = useState<Fiscal | null>(null);
+  const [fiscalNome, setFiscalNome] = useState('');
+  const [fiscalEmail, setFiscalEmail] = useState('');
+  const [fiscalTelefone, setFiscalTelefone] = useState('');
+  const [fiscalDocument, setFiscalDocument] = useState('');
+  const [fiscalPassword, setFiscalPassword] = useState('');
 
   const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState('');
@@ -171,28 +200,7 @@ export default function OperatorDashboardPage() {
       setProfileDesc(data.descricao || '');
       setProfileCancel(data.politica_cancelamento || '');
     } catch (err) {
-      console.warn('Fallback to local storage for company profile');
-      // Retrieve from nzila_carriers cache
-      const cachedCarriers = localStorage.getItem('nzila_carriers');
-      const list = cachedCarriers ? JSON.parse(cachedCarriers) : [];
-      const found = list.find((c: any) => c.id === companyId) || {
-        id: companyId,
-        nome:
-          currentUser?.company_code === 'MACON' ? 'Macon Transportes' : 'Transportadora Parceira',
-        code: currentUser?.company_code || 'MACON',
-        email: currentUser?.email || 'operador@transbook.ao',
-        telefone: '+244 923 101 010',
-        status: currentUser?.company_status || 'APROVADA',
-        color: 'bg-emerald-600',
-        rating: 4.6,
-        reviews: 24,
-        descricao: 'Empresa líder em transporte terrestre interprovincial.',
-        politica_cancelamento:
-          'Cancelamentos permitidos até 24h antes da partida com reembolso de 90%.',
-      };
-      setCompany(found);
-      setProfileDesc(found.descricao || '');
-      setProfileCancel(found.politica_cancelamento || '');
+      toast.error('Erro ao carregar perfil da transportadora do servidor.');
     }
 
     // 2. Fetch Locations (for route creation)
@@ -202,8 +210,7 @@ export default function OperatorDashboardPage() {
       const data = await res.json();
       setLocations(data);
     } catch (err) {
-      const cachedLocs = localStorage.getItem('nzila_locations');
-      if (cachedLocs) setLocations(JSON.parse(cachedLocs));
+      toast.error('Erro ao carregar localizações/estações do servidor.');
     }
 
     // 3. Fetch Buses
@@ -212,19 +219,8 @@ export default function OperatorDashboardPage() {
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setBuses(data);
-      localStorage.setItem(`nzila_operator_buses_${companyId}`, JSON.stringify(data));
     } catch (err) {
-      const cachedBuses = localStorage.getItem(`nzila_operator_buses_${companyId}`);
-      if (cachedBuses) {
-        setBuses(JSON.parse(cachedBuses));
-      } else {
-        const defaultBuses = [
-          { id: 10, modelo: 'Marcopolo Paradiso 1200', capacidade: 44, empresa: companyId },
-          { id: 11, modelo: 'Marcopolo G8 VIP', capacidade: 12, empresa: companyId },
-        ];
-        setBuses(defaultBuses);
-        localStorage.setItem(`nzila_operator_buses_${companyId}`, JSON.stringify(defaultBuses));
-      }
+      toast.error('Erro ao carregar frota de autocarros do servidor.');
     }
 
     // 4. Fetch Routes
@@ -234,12 +230,7 @@ export default function OperatorDashboardPage() {
       const data = await res.json();
       setRoutes(data);
     } catch (err) {
-      const defaultRoutes = [
-        { id: 1, origem: 1, destino: 2, distancia_km: 600, duracao_estimada: '08:30' },
-        { id: 2, origem: 2, destino: 1, distancia_km: 600, duracao_estimada: '08:30' },
-        { id: 3, origem: 1, destino: 3, distancia_km: 500, duracao_estimada: '06:00' },
-      ];
-      setRoutes(defaultRoutes);
+      toast.error('Erro ao carregar rotas do servidor.');
     }
 
     // 5. Fetch Trips
@@ -248,64 +239,18 @@ export default function OperatorDashboardPage() {
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setTrips(data);
-      localStorage.setItem(`nzila_operator_trips_${companyId}`, JSON.stringify(data));
     } catch (err) {
-      const cachedTrips = localStorage.getItem(`nzila_operator_trips_${companyId}`);
-      if (cachedTrips) {
-        setTrips(JSON.parse(cachedTrips));
-      } else {
-        // Build mock trips
-        const mockTrips: Trip[] = [
-          {
-            id: 1,
-            carrier: currentUser?.company_code === 'MACON' ? 'Macon Transportes' : 'Parceiro',
-            carrierCode: currentUser?.company_code || 'MACON',
-            carrierColor: 'bg-blue-600',
-            rating: 4.7,
-            reviews: 142,
-            origin: 'Luanda',
-            destination: 'Huambo',
-            departureTime: '06:00',
-            arrivalTime: '14:30',
-            durationLabel: '8h 30min',
-            class: 'economica',
-            classLabel: 'Económica',
-            availableSeats: 40,
-            totalSeats: 44,
-            price: 4500,
-            amenities: ['ar-condicionado', 'wifi'],
-            status: 'ATIVA',
-            bus_id: 10,
-            route_id: 1,
-            data_saida: '2026-06-15',
-          },
-          {
-            id: 8,
-            carrier: currentUser?.company_code === 'MACON' ? 'Macon Transportes' : 'Parceiro',
-            carrierCode: currentUser?.company_code || 'MACON',
-            carrierColor: 'bg-blue-600',
-            rating: 4.7,
-            reviews: 142,
-            origin: 'Luanda',
-            destination: 'Huambo',
-            departureTime: '05:30',
-            arrivalTime: '14:00',
-            durationLabel: '8h 30min',
-            class: 'executiva',
-            classLabel: 'Executiva',
-            availableSeats: 12,
-            totalSeats: 12,
-            price: 13000,
-            amenities: ['ar-condicionado', 'wifi', 'snack', 'refeicao'],
-            status: 'ATIVA',
-            bus_id: 11,
-            route_id: 1,
-            data_saida: '2026-06-15',
-          },
-        ];
-        setTrips(mockTrips);
-        localStorage.setItem(`nzila_operator_trips_${companyId}`, JSON.stringify(mockTrips));
-      }
+      toast.error('Erro ao carregar partidas/viagens do servidor.');
+    }
+
+    // 6. Fetch Fiscais
+    try {
+      const res = await fetch(`http://localhost:8000/api/carrier/fiscais/?company_id=${companyId}`);
+      if (!res.ok) throw new Error('API Error');
+      const data = await res.json();
+      setFiscais(data);
+    } catch (err) {
+      // Non-critical, suppress error
     }
 
     setIsLoadingData(false);
@@ -314,15 +259,22 @@ export default function OperatorDashboardPage() {
   // BUS CRUD
   const handleAddBus = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!busModel.trim() || !busCapacity) {
-      toast.error('Preencha todos os campos do autocarro.');
+    if (!busModel.trim()) {
+      toast.error('Preencha o modelo do autocarro.');
+      return;
+    }
+    if (busColEsq < 1 || busColDir < 1 || busLinhas < 1) {
+      toast.error('Configuração de assentos inválida.');
       return;
     }
 
     const companyId = currentUser?.company_id || 1;
     const payload = {
       modelo: busModel.trim(),
-      capacidade: parseInt(busCapacity),
+      matricula: busMatricula.trim(),
+      colunas_esquerda: busColEsq,
+      colunas_direita: busColDir,
+      linhas: busLinhas,
       company_id: companyId,
     };
 
@@ -334,27 +286,18 @@ export default function OperatorDashboardPage() {
       });
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to add');
+        throw new Error(errorData.error || 'Não foi possível registar o autocarro no servidor.');
       }
       toast.success('Autocarro adicionado com sucesso!');
       setIsBusModalOpen(false);
       setBusModel('');
+      setBusMatricula('');
+      setBusColEsq(2);
+      setBusColDir(2);
+      setBusLinhas(11);
       fetchCompanyAndOperationalData();
     } catch (err: any) {
-      console.warn('Fallback to local storage for adding bus:', err);
-      const nextId = buses.length > 0 ? Math.max(...buses.map((b) => b.id)) + 1 : 100;
-      const newBus: Bus = {
-        id: nextId,
-        modelo: payload.modelo,
-        capacidade: payload.capacidade,
-        empresa: companyId,
-      };
-      const updated = [...buses, newBus];
-      setBuses(updated);
-      localStorage.setItem(`nzila_operator_buses_${companyId}`, JSON.stringify(updated));
-      toast.success('Autocarro adicionado localmente (Offline)!');
-      setIsBusModalOpen(false);
-      setBusModel('');
+      toast.error(err.message || 'Erro ao adicionar autocarro.');
     }
   };
 
@@ -377,16 +320,12 @@ export default function OperatorDashboardPage() {
       );
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.error || 'Failed to delete');
+        throw new Error(errData.error || 'Falha ao eliminar autocarro.');
       }
       toast.success('Autocarro removido com sucesso!');
       fetchCompanyAndOperationalData();
     } catch (err: any) {
-      console.warn('Fallback to local storage for deleting bus:', err);
-      const updated = buses.filter((b) => b.id !== busId);
-      setBuses(updated);
-      localStorage.setItem(`nzila_operator_buses_${companyId}`, JSON.stringify(updated));
-      toast.success('Autocarro removido localmente (Offline)!');
+      toast.error(err.message || 'Erro ao remover autocarro.');
     }
   };
 
@@ -429,7 +368,7 @@ export default function OperatorDashboardPage() {
       });
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to add route');
+        throw new Error(errorData.error || 'Falha ao adicionar rota.');
       }
       toast.success('Rota adicionada com sucesso!');
       setIsRouteModalOpen(false);
@@ -438,22 +377,7 @@ export default function OperatorDashboardPage() {
       setRouteDistance('');
       fetchCompanyAndOperationalData();
     } catch (err: any) {
-      console.warn('Fallback to local storage for route creation:', err);
-      const nextId = routes.length > 0 ? Math.max(...routes.map((r) => r.id)) + 1 : 100;
-      const newRoute: Route = {
-        id: nextId,
-        origem: payload.origem_id,
-        destino: payload.destino_id,
-        distancia_km: payload.distancia_km,
-        duracao_estimada: payload.duracao_estimada,
-      };
-      const updated = [...routes, newRoute];
-      setRoutes(updated);
-      toast.success('Rota adicionada localmente (Offline)!');
-      setIsRouteModalOpen(false);
-      setRouteOrigin('');
-      setRouteDestination('');
-      setRouteDistance('');
+      toast.error(err.message || 'Erro ao adicionar rota.');
     }
   };
 
@@ -462,13 +386,11 @@ export default function OperatorDashboardPage() {
       const res = await fetch(`http://localhost:8000/api/carrier/routes/${routeId}/`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('API Error');
+      if (!res.ok) throw new Error('Erro ao ligar ao servidor.');
       toast.success('Rota removida com sucesso!');
       fetchCompanyAndOperationalData();
-    } catch (err) {
-      console.warn('Fallback to local storage for deleting route:', err);
-      setRoutes(routes.filter((r) => r.id !== routeId));
-      toast.success('Rota removida localmente (Offline)!');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao eliminar rota.');
     }
   };
 
@@ -515,68 +437,14 @@ export default function OperatorDashboardPage() {
       });
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to create trip');
+        throw new Error(errorData.error || 'Falha ao agendar viagem.');
       }
       toast.success('Viagem agendada com sucesso!');
       setIsTripModalOpen(false);
       resetTripForm();
       fetchCompanyAndOperationalData();
     } catch (err: any) {
-      console.warn('Fallback to local storage for trip creation:', err);
-
-      // Business Rule Check: Check if bus is already scheduled for another active trip at the same time
-      const isBusBusy = trips.some(
-        (t) =>
-          String(t.bus_id) === String(tripBusId) &&
-          t.data_saida === tripDate &&
-          t.departureTime === tripDepTime &&
-          t.status !== 'CANCELADA'
-      );
-      if (isBusBusy) {
-        toast.error('Este autocarro já se encontra escalado para outra viagem nesta mesma hora.');
-        return;
-      }
-
-      const nextId = trips.length > 0 ? Math.max(...trips.map((t) => t.id)) + 1 : 100;
-      const originLoc = locations.find((l) => l.id === selectedRoute.origem)?.nome || 'Origem';
-      const destLoc = locations.find((l) => l.id === selectedRoute.destino)?.nome || 'Destino';
-
-      const newTrip: Trip = {
-        id: nextId,
-        carrier: company?.nome || 'Minha Transportadora',
-        carrierCode: company?.code || 'PARCEIRO',
-        carrierColor: company?.color || 'bg-emerald-600',
-        rating: company?.rating || 4.5,
-        reviews: company?.reviews || 10,
-        origin: originLoc,
-        destination: destLoc,
-        departureTime: tripDepTime,
-        arrivalTime: tripArrTime,
-        durationLabel: selectedRoute.duracao_estimada,
-        class: tripClass.toLowerCase(),
-        classLabel:
-          tripClass === 'ECONOMICA'
-            ? 'Económica'
-            : tripClass === 'CONFORTO'
-              ? 'Conforto'
-              : 'Executiva',
-        availableSeats: selectedBus.capacidade,
-        totalSeats: selectedBus.capacidade,
-        price: parseFloat(tripPrice),
-        amenities: tripAmenities,
-        status: 'ATIVA',
-        bus_id: selectedBus.id,
-        route_id: selectedRoute.id,
-        data_saida: tripDate,
-        preco_ida_volta: tripPriceReturn ? parseFloat(tripPriceReturn) : undefined,
-      };
-
-      const updated = [newTrip, ...trips];
-      setTrips(updated);
-      localStorage.setItem(`nzila_operator_trips_${companyId}`, JSON.stringify(updated));
-      toast.success('Viagem agendada localmente (Offline)!');
-      setIsTripModalOpen(false);
-      resetTripForm();
+      toast.error(err.message || 'Erro ao agendar viagem.');
     }
   };
 
@@ -597,20 +465,11 @@ export default function OperatorDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CANCELADA', company_id: companyId }),
       });
-      if (!res.ok) throw new Error('API Error');
+      if (!res.ok) throw new Error('Erro ao ligar ao servidor.');
       toast.success('Viagem cancelada com sucesso. Notificações enviadas aos passageiros.');
       fetchCompanyAndOperationalData();
-    } catch (err) {
-      console.warn('Fallback to local storage for cancelling trip:', err);
-      const updated = trips.map((t) => {
-        if (t.id === tripId) {
-          return { ...t, status: 'CANCELADA' };
-        }
-        return t;
-      });
-      setTrips(updated);
-      localStorage.setItem(`nzila_operator_trips_${companyId}`, JSON.stringify(updated));
-      toast.success('Viagem cancelada localmente (Offline).');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao cancelar viagem.');
     }
   };
 
@@ -622,20 +481,11 @@ export default function OperatorDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ preco_ida: newPrice, company_id: companyId }),
       });
-      if (!res.ok) throw new Error('API Error');
+      if (!res.ok) throw new Error('Erro ao ligar ao servidor.');
       toast.success('Preço da viagem atualizado com sucesso!');
       fetchCompanyAndOperationalData();
-    } catch (err) {
-      console.warn('Fallback to local storage for trip price update:', err);
-      const updated = trips.map((t) => {
-        if (t.id === tripId) {
-          return { ...t, price: newPrice };
-        }
-        return t;
-      });
-      setTrips(updated);
-      localStorage.setItem(`nzila_operator_trips_${companyId}`, JSON.stringify(updated));
-      toast.success('Preço atualizado localmente (Offline).');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao atualizar preço da viagem.');
     }
   };
 
@@ -649,6 +499,86 @@ export default function OperatorDashboardPage() {
     setTripPriceReturn('');
     setTripClass('ECONOMICA');
     setTripAmenities(['ar-condicionado']);
+  };
+
+  // FISCAIS CRUD
+  const handleOpenFiscalModal = (fiscal?: Fiscal) => {
+    if (fiscal) {
+      setEditingFiscal(fiscal);
+      setFiscalNome(fiscal.nome);
+      setFiscalEmail(fiscal.email);
+      setFiscalTelefone(fiscal.telefone || '');
+      setFiscalDocument(fiscal.document || '');
+      setFiscalPassword('');
+    } else {
+      setEditingFiscal(null);
+      setFiscalNome('');
+      setFiscalEmail('');
+      setFiscalTelefone('');
+      setFiscalDocument('');
+      setFiscalPassword('');
+    }
+    setIsFiscalModalOpen(true);
+  };
+
+  const handleSaveFiscal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const companyId = currentUser?.company_id || 1;
+
+    if (!fiscalNome.trim() || !fiscalEmail.trim()) {
+      toast.error('Nome e email são obrigatórios.');
+      return;
+    }
+    if (!editingFiscal && !fiscalPassword.trim()) {
+      toast.error('A palavra-passe é obrigatória ao criar um novo fiscal.');
+      return;
+    }
+
+    const payload: any = {
+      nome: fiscalNome.trim(),
+      email: fiscalEmail.trim(),
+      telefone: fiscalTelefone.trim(),
+      document: fiscalDocument.trim(),
+      company_id: companyId,
+    };
+    if (fiscalPassword.trim()) payload.password = fiscalPassword.trim();
+
+    try {
+      const url = editingFiscal
+        ? `http://localhost:8000/api/carrier/fiscais/${editingFiscal.id}/`
+        : 'http://localhost:8000/api/carrier/fiscais/';
+      const method = editingFiscal ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Falha ao gravar fiscal.');
+      }
+      toast.success(editingFiscal ? 'Fiscal atualizado com sucesso!' : 'Fiscal criado com sucesso!');
+      setIsFiscalModalOpen(false);
+      fetchCompanyAndOperationalData();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao guardar fiscal.');
+    }
+  };
+
+  const handleDeleteFiscal = async (id: number) => {
+    if (!window.confirm('Tem a certeza que deseja remover este fiscal?')) return;
+    const companyId = currentUser?.company_id || 1;
+    try {
+      const res = await fetch(`http://localhost:8000/api/carrier/fiscais/${id}/?company_id=${companyId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Falha ao remover fiscal.');
+      toast.success('Fiscal removido com sucesso!');
+      fetchCompanyAndOperationalData();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover fiscal.');
+    }
   };
 
   // PROFILE SAVE
@@ -669,31 +599,11 @@ export default function OperatorDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error('API Error');
+      if (!res.ok) throw new Error('Erro ao ligar ao servidor.');
       toast.success('Perfil atualizado com sucesso!');
       fetchCompanyAndOperationalData();
-    } catch (err) {
-      console.warn('Fallback to local storage for profile save:', err);
-
-      // Save locally
-      const cachedCarriers = localStorage.getItem('nzila_carriers');
-      if (cachedCarriers) {
-        const list = JSON.parse(cachedCarriers);
-        const index = list.findIndex((c: any) => c.id === companyId);
-        if (index !== -1) {
-          list[index].descricao = payload.descricao;
-          list[index].politica_cancelamento = payload.politica_cancelamento;
-          localStorage.setItem('nzila_carriers', JSON.stringify(list));
-        }
-      }
-      if (company) {
-        setCompany({
-          ...company,
-          descricao: payload.descricao,
-          politica_cancelamento: payload.politica_cancelamento,
-        });
-      }
-      toast.success('Perfil guardado localmente (Offline)!');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao gravar o perfil.');
     } finally {
       setIsSavingProfile(false);
     }
@@ -837,7 +747,7 @@ export default function OperatorDashboardPage() {
       {/* Bus Modal */}
       {isBusModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in font-sans">
+          <div className="w-full max-w-lg bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in font-sans overflow-y-auto max-h-[90vh]">
             <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
               <h3 className="text-base font-bold text-foreground">Novo Autocarro</h3>
               <button
@@ -848,34 +758,101 @@ export default function OperatorDashboardPage() {
               </button>
             </div>
             <form onSubmit={handleAddBus} className="space-y-4 text-sm font-semibold">
-              <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
-                  Modelo do Veículo
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Marcopolo Paradiso G8"
-                  value={busModel}
-                  onChange={(e) => setBusModel(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Modelo do Veículo *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: Marcopolo Paradiso G8"
+                    value={busModel}
+                    onChange={(e) => setBusModel(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Matrícula (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: LD-12-34-AB"
+                    value={busMatricula}
+                    onChange={(e) => setBusMatricula(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
-                  Capacidade de Lugares (Poltronas)
-                </label>
-                <select
-                  value={busCapacity}
-                  onChange={(e) => setBusCapacity(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary cursor-pointer font-semibold"
-                >
-                  <option value="12">12 Lugares (Vip Lounge)</option>
-                  <option value="28">28 Lugares (Executivo)</option>
-                  <option value="44">44 Lugares (Económico)</option>
-                  <option value="54">54 Lugares (Alta Lotação)</option>
-                </select>
+
+              {/* Seat Layout Configuration */}
+              <div className="bg-muted/40 border border-border rounded-2xl p-4 space-y-3">
+                <p className="text-xs font-black text-foreground uppercase tracking-wider">Layout de Assentos</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Colunas Esq.</label>
+                    <input
+                      type="number" min="1" max="4"
+                      value={busColEsq}
+                      onChange={(e) => setBusColEsq(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
+                      className="w-full px-3 py-2 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary text-center font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Colunas Dir.</label>
+                    <input
+                      type="number" min="1" max="4"
+                      value={busColDir}
+                      onChange={(e) => setBusColDir(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
+                      className="w-full px-3 py-2 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary text-center font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Fileiras</label>
+                    <input
+                      type="number" min="1" max="20"
+                      value={busLinhas}
+                      onChange={(e) => setBusLinhas(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                      className="w-full px-3 py-2 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary text-center font-bold"
+                    />
+                  </div>
+                </div>
+
+                {/* Visual Seat Preview */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] text-muted-foreground font-semibold">Pré-visualização do Layout</p>
+                    <span className="text-xs font-black text-primary">{busCapacidade} lugares no total</span>
+                  </div>
+                  <div className="bg-background border border-border rounded-xl p-3 overflow-x-auto">
+                    {/* Bus front */}
+                    <div className="text-center text-[9px] text-muted-foreground font-bold mb-2 tracking-widest">— FRENTE DO AUTOCARRO —</div>
+                    <div className="inline-flex flex-col gap-1 min-w-full">
+                      {Array.from({ length: Math.min(busLinhas, 6) }).map((_, rowIdx) => (
+                        <div key={rowIdx} className="flex items-center gap-1">
+                          <span className="text-[9px] text-muted-foreground w-5 text-right font-bold">{String(rowIdx + 1).padStart(2, '0')}</span>
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: busColEsq }).map((_, ci) => (
+                              <div key={ci} className="w-5 h-4 rounded-sm bg-primary/20 border border-primary/40 text-[7px] flex items-center justify-center text-primary font-bold">
+                                {String.fromCharCode(65 + ci)}
+                              </div>
+                            ))}
+                          </div>
+                          <div className="w-2 border-l-2 border-dashed border-border h-4" />
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: busColDir }).map((_, ci) => (
+                              <div key={ci} className="w-5 h-4 rounded-sm bg-blue-500/20 border border-blue-500/40 text-[7px] flex items-center justify-center text-blue-500 font-bold">
+                                {String.fromCharCode(65 + busColEsq + ci)}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {busLinhas > 6 && (
+                        <div className="text-center text-[9px] text-muted-foreground font-bold">... mais {busLinhas - 6} fileiras</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
+
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
@@ -888,7 +865,7 @@ export default function OperatorDashboardPage() {
                   type="submit"
                   className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all"
                 >
-                  Criar Frota
+                  Adicionar Autocarro
                 </button>
               </div>
             </form>
@@ -1181,6 +1158,105 @@ export default function OperatorDashboardPage() {
         </div>
       )}
 
+      {/* Fiscal Modal */}
+      {isFiscalModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in font-sans">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-base font-bold text-foreground">
+                {editingFiscal ? 'Editar Fiscal' : 'Novo Fiscal de Pista'}
+              </h3>
+              <button
+                onClick={() => setIsFiscalModalOpen(false)}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveFiscal} className="space-y-4 text-sm font-semibold">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nome Completo *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: João Fernandes Silva"
+                  value={fiscalNome}
+                  onChange={(e) => setFiscalNome(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Email {editingFiscal ? '(não editável)' : '*'}
+                </label>
+                <input
+                  type="email"
+                  required
+                  disabled={!!editingFiscal}
+                  placeholder="fiscal@transportadora.ao"
+                  value={fiscalEmail}
+                  onChange={(e) => setFiscalEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Telefone</label>
+                  <input
+                    type="tel"
+                    placeholder="+244 9XX XXX XXX"
+                    value={fiscalTelefone}
+                    onChange={(e) => setFiscalTelefone(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nº Documento</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 005432168LA045"
+                    value={fiscalDocument}
+                    onChange={(e) => setFiscalDocument(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  {editingFiscal ? 'Nova Palavra-Passe (deixar em branco para manter)' : 'Palavra-Passe *'}
+                </label>
+                <input
+                  type="password"
+                  required={!editingFiscal}
+                  placeholder="Mínimo 8 caracteres"
+                  value={fiscalPassword}
+                  onChange={(e) => setFiscalPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-[10px] text-primary font-semibold">
+                💡 O fiscal usará este email e palavra-passe para entrar na aplicação móvel de validação de bilhetes.
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFiscalModalOpen(false)}
+                  className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all"
+                >
+                  {editingFiscal ? 'Guardar Alterações' : 'Criar Fiscal'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 pt-24 pb-16 font-sans">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           {/* Header Dashboard Banner */}
@@ -1214,6 +1290,7 @@ export default function OperatorDashboardPage() {
                 { id: 'frota', label: 'Frota', icon: Users },
                 { id: 'rotas', label: 'Rotas', icon: MapPin },
                 { id: 'viagens', label: 'Viagens / Escalas', icon: Calendar },
+                { id: 'fiscais', label: 'Fiscais', icon: ShieldCheck },
                 { id: 'perfil', label: 'Perfil Empresa', icon: Building2 },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -1276,14 +1353,17 @@ export default function OperatorDashboardPage() {
                       >
                         <div className="space-y-1.5 min-w-0">
                           <span className="block font-bold text-foreground text-sm truncate font-sans">
-                            {bus.modelo}
+                            {bus.modelo}{bus.matricula ? ` — ${bus.matricula}` : ''}
                           </span>
                           <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                             <Users size={12} className="text-primary" /> {bus.capacidade} Lugares
                           </span>
                           <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                            <Calendar size={12} className="text-primary" /> {busTripsCount} Partidas
-                            Agendadas
+                            <MapPin size={12} className="text-primary" />
+                            Layout: {bus.colunas_esquerda}+{bus.colunas_direita} × {bus.linhas} fileiras
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
+                            <Calendar size={12} className="text-primary" /> {busTripsCount} Partidas Agendadas
                           </span>
                         </div>
                         <button
@@ -1535,7 +1615,91 @@ export default function OperatorDashboardPage() {
             </div>
           )}
 
-          {/* TAB 4: PROFILE & SETTINGS (PERFIL EMPRESA) */}
+          {/* TAB 4: FISCAIS */}
+          {activeTab === 'fiscais' && (
+            <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-border pb-4 flex-wrap gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Gestão de Fiscais</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Adicione e gira os fiscais de pista responsáveis pela validação de bilhetes nos autocarros.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleOpenFiscalModal()}
+                  className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-accent transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  <span>Novo Fiscal</span>
+                </button>
+              </div>
+
+              {isLoadingData ? (
+                <div className="text-center py-12 text-muted-foreground font-bold">
+                  A carregar fiscais...
+                </div>
+              ) : fiscais.length === 0 ? (
+                <div className="text-center py-16 space-y-3">
+                  <ShieldCheck className="mx-auto text-muted-foreground/30" size={48} />
+                  <p className="text-sm text-muted-foreground font-semibold">
+                    Nenhum fiscal registado. Adicione fiscais de pista para validar bilhetes.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {fiscais.map((fiscal) => (
+                    <div
+                      key={`fiscal-${fiscal.id}`}
+                      className="p-5 bg-muted/20 border border-border rounded-2xl space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-sm flex-shrink-0">
+                          {fiscal.nome.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-foreground text-sm truncate">{fiscal.nome}</p>
+                          <p className="text-[10px] text-muted-foreground font-medium truncate">{fiscal.email}</p>
+                        </div>
+                        <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-[9px] font-black tracking-wide flex-shrink-0">
+                          FISCAL
+                        </span>
+                      </div>
+                      {fiscal.telefone && (
+                        <p className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5">
+                          <Clock size={10} className="text-primary" />
+                          {fiscal.telefone}
+                        </p>
+                      )}
+                      {fiscal.document && (
+                        <p className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5">
+                          <FileText size={10} className="text-primary" />
+                          Doc: {fiscal.document}
+                        </p>
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => handleOpenFiscalModal(fiscal)}
+                          className="flex-1 py-1.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl text-[10px] transition-colors flex items-center justify-center gap-1"
+                        >
+                          <Save size={10} />
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteFiscal(fiscal.id)}
+                          className="flex-1 py-1.5 border border-danger/25 text-danger hover:bg-danger/5 font-bold rounded-xl text-[10px] transition-colors flex items-center justify-center gap-1"
+                        >
+                          <Trash2 size={10} />
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: PROFILE & SETTINGS (PERFIL EMPRESA) */}
           {activeTab === 'perfil' && (
             <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 animate-fade-in">
               <div className="border-b border-border pb-4">

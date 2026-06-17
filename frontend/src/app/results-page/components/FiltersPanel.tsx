@@ -3,7 +3,7 @@
 import React from 'react';
 import { RotateCcw } from 'lucide-react';
 import { FilterState } from './ResultsContent';
-import { Trip, ALL_CARRIERS, ALL_CLASSES } from './mockTrips';
+import { Trip } from './mockTrips';
 
 interface FiltersPanelProps {
   filters: FilterState;
@@ -24,6 +24,22 @@ const CLASS_LABELS: Record<string, string> = {
 };
 
 export default function FiltersPanel({ filters, setFilters, trips }: FiltersPanelProps) {
+  // Dynamically extract classes and carriers from loaded trips
+  const allClasses = React.useMemo(() => {
+    const classes = [...new Set(trips.map((t) => t.class))].filter(Boolean);
+    return classes.length > 0 ? classes : ['economica', 'executiva', 'vip'];
+  }, [trips]);
+
+  const allCarriers = React.useMemo(() => {
+    return [...new Set(trips.map((t) => t.carrier))].filter(Boolean);
+  }, [trips]);
+
+  const maxPriceLimit = React.useMemo(() => {
+    const prices = trips.map((t) => t.price);
+    const maxVal = prices.length > 0 ? Math.max(...prices) : 20000;
+    return Math.max(maxVal, 20000);
+  }, [trips]);
+
   const toggleArrayFilter = (key: keyof FilterState, value: string) => {
     setFilters((prev) => {
       const arr = prev[key] as string[];
@@ -37,7 +53,7 @@ export default function FiltersPanel({ filters, setFilters, trips }: FiltersPane
   const resetFilters = () => {
     setFilters({
       priceMin: 0,
-      priceMax: 20000,
+      priceMax: maxPriceLimit,
       horarios: [],
       classes: [],
       carriers: [],
@@ -49,7 +65,7 @@ export default function FiltersPanel({ filters, setFilters, trips }: FiltersPane
     filters.classes.length > 0 ||
     filters.carriers.length > 0 ||
     filters.priceMin > 0 ||
-    filters.priceMax < 20000;
+    filters.priceMax < maxPriceLimit;
 
   // Count trips per carrier for display
   const carrierCounts: Record<string, number> = {};
@@ -86,9 +102,9 @@ export default function FiltersPanel({ filters, setFilters, trips }: FiltersPane
           <input
             type="range"
             min={0}
-            max={20000}
+            max={maxPriceLimit}
             step={500}
-            value={filters.priceMax}
+            value={filters.priceMax > maxPriceLimit ? maxPriceLimit : filters.priceMax}
             onChange={(e) => setFilters((f) => ({ ...f, priceMax: Number(e.target.value) }))}
             className="w-full accent-primary"
           />
@@ -135,91 +151,95 @@ export default function FiltersPanel({ filters, setFilters, trips }: FiltersPane
         </div>
 
         {/* Class */}
-        <div>
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Classe
-          </h4>
-          <div className="space-y-2">
-            {ALL_CLASSES.map((cls) => (
-              <label
-                key={`filter-class-${cls}`}
-                className="flex items-center gap-2.5 cursor-pointer group"
-              >
-                <div
-                  onClick={() => toggleArrayFilter('classes', cls)}
-                  className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 cursor-pointer ${
-                    filters.classes.includes(cls)
-                      ? 'bg-primary border-primary'
-                      : 'border-input group-hover:border-primary'
-                  }`}
+        {allClasses.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Classe
+            </h4>
+            <div className="space-y-2">
+              {allClasses.map((cls) => (
+                <label
+                  key={`filter-class-${cls}`}
+                  className="flex items-center gap-2.5 cursor-pointer group"
                 >
-                  {filters.classes.includes(cls) && (
-                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                      <path
-                        d="M1 4L3.5 6.5L9 1"
-                        stroke="white"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </div>
-                <span
-                  onClick={() => toggleArrayFilter('classes', cls)}
-                  className="text-sm text-foreground cursor-pointer"
-                >
-                  {CLASS_LABELS[cls] || cls}
-                </span>
-              </label>
-            ))}
+                  <div
+                    onClick={() => toggleArrayFilter('classes', cls)}
+                    className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 cursor-pointer ${
+                      filters.classes.includes(cls)
+                        ? 'bg-primary border-primary'
+                        : 'border-input group-hover:border-primary'
+                    }`}
+                  >
+                    {filters.classes.includes(cls) && (
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                        <path
+                          d="M1 4L3.5 6.5L9 1"
+                          stroke="white"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <span
+                    onClick={() => toggleArrayFilter('classes', cls)}
+                    className="text-sm text-foreground cursor-pointer"
+                  >
+                    {CLASS_LABELS[cls] || cls}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Carrier */}
-        <div>
-          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Transportadora
-          </h4>
-          <div className="space-y-2">
-            {ALL_CARRIERS.map((carrier) => (
-              <label
-                key={`filter-carrier-${carrier}`}
-                className="flex items-center gap-2.5 cursor-pointer group"
-              >
-                <div
-                  onClick={() => toggleArrayFilter('carriers', carrier)}
-                  className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 cursor-pointer ${
-                    filters.carriers.includes(carrier)
-                      ? 'bg-primary border-primary'
-                      : 'border-input group-hover:border-primary'
-                  }`}
+        {allCarriers.length > 0 && (
+          <div>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Transportadora
+            </h4>
+            <div className="space-y-2">
+              {allCarriers.map((carrier) => (
+                <label
+                  key={`filter-carrier-${carrier}`}
+                  className="flex items-center gap-2.5 cursor-pointer group"
                 >
-                  {filters.carriers.includes(carrier) && (
-                    <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                      <path
-                        d="M1 4L3.5 6.5L9 1"
-                        stroke="white"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  )}
-                </div>
-                <div
-                  onClick={() => toggleArrayFilter('carriers', carrier)}
-                  className="flex items-center justify-between flex-1 cursor-pointer"
-                >
-                  <span className="text-sm text-foreground">{carrier}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {carrierCounts[carrier] || 0}
-                  </span>
-                </div>
-              </label>
-            ))}
+                  <div
+                    onClick={() => toggleArrayFilter('carriers', carrier)}
+                    className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 cursor-pointer ${
+                      filters.carriers.includes(carrier)
+                        ? 'bg-primary border-primary'
+                        : 'border-input group-hover:border-primary'
+                    }`}
+                  >
+                    {filters.carriers.includes(carrier) && (
+                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                        <path
+                          d="M1 4L3.5 6.5L9 1"
+                          stroke="white"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <div
+                    onClick={() => toggleArrayFilter('carriers', carrier)}
+                    className="flex items-center justify-between flex-1 cursor-pointer"
+                  >
+                    <span className="text-sm text-foreground">{carrier}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {carrierCounts[carrier] || 0}
+                    </span>
+                  </div>
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

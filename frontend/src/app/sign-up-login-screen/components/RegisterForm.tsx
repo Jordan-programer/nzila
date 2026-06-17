@@ -22,7 +22,6 @@ import {
   Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { addSimulatedEmailNotification } from '@/app/components/mockDb';
 import { supabase } from '@/lib/supabaseClient';
 
 interface RegisterFormData {
@@ -296,23 +295,14 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
         return;
       }
 
-      setClientServerOtp(resData.otp || '123456');
+      setClientServerOtp(resData.otp);
       setPassengerData(data);
       setIsClientOtpVerification(true);
       startClientCooldown();
 
       toast.success('Código de verificação enviado! Verifique o seu email.');
     } catch (err) {
-      console.warn('Fallback to Local OTP for passenger registration:', err);
-      // Offline fallback
-      const generatedOtp = '123456';
-      setClientServerOtp(generatedOtp);
-      setPassengerData(data);
-      setIsClientOtpVerification(true);
-      startClientCooldown();
-      toast.info(`OTP enviado (Offline)! Use o código: ${generatedOtp}`, {
-        duration: 9000,
-      });
+      toast.error('Erro de ligação ao servidor. Não foi possível enviar o código OTP.');
     } finally {
       setIsLoading(false);
     }
@@ -325,7 +315,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
       return;
     }
 
-    if (clientOtpCode !== clientServerOtp && clientOtpCode !== '123456') {
+    if (clientOtpCode !== clientServerOtp) {
       toast.error('Código de verificação OTP incorreto.');
       return;
     }
@@ -352,7 +342,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
         return;
       }
 
-      // Save to mock session
+      // Save to session
       const loggedUser = {
         email: resData.user.email,
         name: resData.user.name || passengerData.fullName,
@@ -377,30 +367,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
         router.push('/client');
       }
     } catch (err) {
-      console.warn('Fallback to Local Storage for passenger registration:', err);
-      // Offline fallback
-      const newUser = {
-        email: passengerData.email,
-        name: passengerData.fullName,
-        phone: '+244 ' + passengerData.phone,
-        document: '005432168LA045',
-        avatar:
-          'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80',
-        role: 'cliente',
-      };
-      localStorage.setItem('nzila_current_user', JSON.stringify(newUser));
-      window.dispatchEvent(new Event('storage'));
-
-      toast.success('Conta criada com sucesso (Offline)!', {
-        description: `Bem-vindo ao Nzila, ${passengerData.fullName.split(' ')[0]}!`,
-      });
-
-      const tripId = searchParams.get('trip');
-      if (tripId) {
-        router.push(`/payment?trip=${tripId}`);
-      } else {
-        router.push('/client');
-      }
+      toast.error('Erro de ligação ao servidor. Não foi possível criar a conta.');
     } finally {
       setIsLoading(false);
     }
@@ -424,17 +391,12 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
       if (!res.ok) {
         toast.error(resData.error || 'Erro ao reenviar o código.');
       } else {
-        setClientServerOtp(resData.otp || '123456');
+        setClientServerOtp(resData.otp);
         toast.success('Código de verificação reenviado! Verifique o seu email.');
         startClientCooldown();
       }
     } catch (err) {
-      const generatedOtp = String(Math.floor(100000 + Math.random() * 900000));
-      setClientServerOtp(generatedOtp);
-      startClientCooldown();
-      toast.info(`Novo código enviado (Offline)! Use o código: ${generatedOtp}`, {
-        duration: 9000,
-      });
+      toast.error('Erro de ligação ao servidor.');
     } finally {
       setIsResendingClientOtp(false);
     }
@@ -566,9 +528,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
         startCooldown();
       }
     } catch {
-      // Offline fallback
-      toast.info('Modo offline: use o código 123456.');
-      startCooldown();
+      toast.error('Erro ao ligar ao servidor. Não foi possível reenviar o código.');
     } finally {
       setIsResending(false);
     }
@@ -678,7 +638,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
       }
 
       // Set verification state
-      const generatedOtp = data.otp || '123456';
+      const generatedOtp = data.otp;
       setServerOtp(generatedOtp);
       toast.info(`OTP enviado! Use o código de verificação: ${generatedOtp}`, {
         duration: 9000,
@@ -687,53 +647,8 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
       setIsSubmittingCarrier(false);
       nextStep(); // Go to step 4 OTP
     } catch (err) {
-      console.warn('Fallback to LocalStorage for carrier registration:', err);
-      // Offline mode simulated registration
-      const generatedOtp = '123456';
-      setServerOtp(generatedOtp);
-      toast.info(`OTP enviado (Offline)! Use o código de verificação: ${generatedOtp}`, {
-        duration: 9000,
-      });
-
-      // Save to localStorage simulated company database
-      const cached = localStorage.getItem('nzila_carriers') || '[]';
-      const list = JSON.parse(cached);
-      const newId = list.length > 0 ? Math.max(...list.map((c: any) => c.id)) + 1 : 100;
-      const newCarrier = {
-        id: newId,
-        nome: compNome,
-        nif: compNif,
-        email: compEmail,
-        telefone: compTelefone,
-        endereco: compEndereco,
-        provincia: compProvincia,
-        municipio: compMunicipio,
-        tipo_empresa: compTipo,
-        ano_fundacao: compAno,
-        logo_url:
-          compLogo ||
-          'https://images.unsplash.com/photo-1557683316-973673baf926?w=150&auto=format&fit=crop&q=60',
-        status: 'PENDENTE',
-        created_at: new Date().toISOString(),
-        documents: [
-          { tipo: 'REGISTO_COMERCIAL', arquivo_url: docRegisto, aprovado: false },
-          { tipo: 'ALVARA', arquivo_url: docAlvara, aprovado: false },
-          { tipo: 'CONTRIBUINTE', arquivo_url: docContribuinte, aprovado: false },
-        ],
-        admins: [
-          {
-            nome: respNome,
-            email: respEmail,
-            telefone: respTelefone,
-            cargo: respCargo,
-            documento_identificacao: respDoc,
-          },
-        ],
-      };
-      localStorage.setItem('nzila_carriers', JSON.stringify([...list, newCarrier]));
-
       setIsSubmittingCarrier(false);
-      nextStep();
+      toast.error('Ocorreu um erro de ligação ao servidor do backend.');
     }
   };
 
@@ -762,46 +677,11 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
 
       toast.success('Contacto verificado com sucesso!');
 
-      // Notify Admin
-      addSimulatedEmailNotification(
-        'admin@transbook.ao',
-        `Nova candidatura de transportadora: ${compNome}`,
-        `A empresa ${compNome} (NIF: ${compNif}) concluiu a verificação de segurança e aguarda aprovação de documentos.`
-      );
-
-      // Notify Carrier Operator
-      addSimulatedEmailNotification(
-        respEmail,
-        `Candidatura Recebida - Nzila`,
-        `Olá ${respNome}, a candidatura da sua transportadora '${compNome}' foi submetida com sucesso! O administrador irá avaliar os documentos e o status atual é PENDENTE.`
-      );
-
       setIsSubmittingCarrier(false);
       nextStep(); // Go to step 5 Success
     } catch (err) {
-      if (otpCode !== serverOtp && otpCode !== '123456') {
-        toast.error('Código de verificação OTP incorreto.');
-        setIsSubmittingCarrier(false);
-        return;
-      }
-      toast.success('Contacto verificado com sucesso (Offline)!');
-
-      // Notify Admin Offline
-      addSimulatedEmailNotification(
-        'admin@transbook.ao',
-        `Nova candidatura de transportadora: ${compNome}`,
-        `A empresa ${compNome} (NIF: ${compNif}) concluiu a verificação de segurança (Offline) e aguarda aprovação de documentos.`
-      );
-
-      // Notify Carrier Operator Offline
-      addSimulatedEmailNotification(
-        respEmail,
-        `Candidatura Recebida - Nzila (Offline)`,
-        `Olá ${respNome}, a candidatura da sua transportadora '${compNome}' foi submetida com sucesso (Offline)! O administrador irá avaliar os documentos e o status atual é PENDENTE.`
-      );
-
       setIsSubmittingCarrier(false);
-      nextStep();
+      toast.error('Ocorreu um erro de ligação ao servidor do backend.');
     }
   };
 

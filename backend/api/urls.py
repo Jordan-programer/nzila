@@ -47,6 +47,8 @@ urlpatterns = [
     path('carrier/routes/<int:pk>/', views.carrier_manage_routes, name='carrier_manage_route_detail'),
     path('carrier/trips/', views.carrier_manage_trips, name='carrier_manage_trips'),
     path('carrier/trips/<int:pk>/', views.carrier_manage_trips, name='carrier_manage_trip_detail'),
+    path('carrier/fiscais/', views.carrier_manage_fiscais, name='carrier_manage_fiscais'),
+    path('carrier/fiscais/<int:pk>/', views.carrier_manage_fiscais, name='carrier_manage_fiscal_detail'),
     path('notifications/', views.list_notifications, name='list_notifications'),
     
     # Dynamic Popular Routes & Transport Companies API URLs

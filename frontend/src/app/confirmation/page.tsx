@@ -4,7 +4,24 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { getReservationById, Reservation } from '@/app/components/mockDb';
+interface Reservation {
+  id: string;
+  codigo_reserva: string;
+  origin: string;
+  destination: string;
+  passengerName: string;
+  passengerEmail: string;
+  passengerDocument: string;
+  seat: string;
+  classLabel: string;
+  departureTime: string;
+  arrivalTime: string;
+  carrier: string;
+  carrierCode: string;
+  carrierColor: string;
+  price: number;
+  paymentMethod: string;
+}
 import { toast } from 'sonner';
 import {
   Check,
@@ -55,13 +72,18 @@ function ConfirmationContent() {
       return;
     }
 
-    const res = getReservationById(code);
-    if (!res) {
-      toast.error('Reserva não encontrada no sistema.');
-      // router.push('/results-page');
-      return;
-    }
-    setReservation(res);
+    const fetchReservation = async () => {
+      try {
+        const res = await fetch(`http://localhost:8000/api/reservations/${code}/`);
+        if (!res.ok) throw new Error('Reserva não encontrada no sistema.');
+        const data = await res.json();
+        setReservation(data);
+      } catch (err: any) {
+        toast.error(err.message || 'Erro ao carregar detalhes da reserva.');
+      }
+    };
+
+    fetchReservation();
   }, [code, router]);
 
   const handlePrint = () => {

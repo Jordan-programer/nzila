@@ -65,7 +65,8 @@ DATABASES = {
         'USER': 'postgres.trcbuiqdsycxugsqrirz',
         'PASSWORD': 'Nzila@123bb',
         'HOST': 'aws-0-eu-west-1.pooler.supabase.com',
-        'PORT': '6543',
+        'PORT': '5432',
+        'DISABLE_SERVER_SIDE_CURSORS': True,
     }
 }
 

@@ -1,10 +1,27 @@
+# pyrefly: ignore [missing-import]
 from rest_framework import serializers
+# pyrefly: ignore [missing-import]
 from django.contrib.auth.models import User
+# pyrefly: ignore [missing-import]
 from .models import (
     UserProfile, Company, Location, Route, Bus, Seat,
     Trip, Reservation, ReservationSeat, Payment, Ticket, Notification,
     CompanyAdmin, CompanyDocument, PopularRoute
 )
+
+class FiscalSerializer(serializers.ModelSerializer):
+    """Serializer for UserProfile records with role=FISCAL"""
+    id = serializers.IntegerField(read_only=True)
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    email = serializers.EmailField()
+    nome = serializers.CharField()
+    telefone = serializers.CharField(allow_blank=True, required=False)
+    document = serializers.CharField(allow_blank=True, required=False)
+    company_id = serializers.IntegerField(source='company.id', read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = ['id', 'user_id', 'nome', 'email', 'telefone', 'document', 'company_id', 'role']
 
 class UserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='profile.nome', read_only=True)
@@ -47,7 +64,7 @@ class RouteSerializer(serializers.ModelSerializer):
 class BusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bus
-        fields = '__all__'
+        fields = ['id', 'empresa', 'modelo', 'matricula', 'capacidade', 'colunas_esquerda', 'colunas_direita', 'linhas']
 
 class SeatSerializer(serializers.ModelSerializer):
     class Meta:
@@ -77,6 +94,7 @@ class TripSerializer(serializers.ModelSerializer):
     totalSeats = serializers.IntegerField(source='bus.capacidade', read_only=True)
     price = serializers.IntegerField(source='preco_ida', read_only=True)
     amenities = serializers.SerializerMethodField()
+    occupiedSeats = serializers.SerializerMethodField()
 
     class Meta:
         model = Trip
@@ -84,7 +102,7 @@ class TripSerializer(serializers.ModelSerializer):
             'id', 'carrier', 'carrierCode', 'carrierColor', 'rating', 'reviews',
             'origin', 'destination', 'departureTime', 'arrivalTime', 'durationMinutes',
             'durationLabel', 'class_name', 'classLabel', 'availableSeats', 'totalSeats',
-            'price', 'amenities'
+            'price', 'amenities', 'occupiedSeats'
         ]
 
     # Map class_name to keep key "class" compatible in JSON response
@@ -130,6 +148,13 @@ class TripSerializer(serializers.ModelSerializer):
     def get_amenities(self, obj):
         return obj.get_amenities_list()
 
+    def get_occupiedSeats(self, obj):
+        seats = ReservationSeat.objects.filter(
+            reservation__trip=obj,
+            reservation__status__in=['CONFIRMADA', 'EMBARCADO']
+        ).values_list('seat__numero', flat=True)
+        return list(seats)
+
 class ReservationSerializer(serializers.ModelSerializer):
     trip_details = TripSerializer(source='trip', read_only=True)
     passenger_name = serializers.CharField(source='user.profile.nome', read_only=True)
@@ -167,6 +192,8 @@ class ReservationSerializer(serializers.ModelSerializer):
     # Map model PK `id` and `status` in to_representation to match front expectations
     def to_representation(self, instance):
         repr_data = super().to_representation(instance)
+        # Map ID to human-readable reservation code
+        repr_data['id'] = instance.codigo_reserva
         # Frontend expects 'CONFIRMADO' status key
         status_map = {
             'CONFIRMADA': 'CONFIRMADO',

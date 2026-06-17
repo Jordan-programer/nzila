@@ -21,8 +21,8 @@ interface LoginFormProps {
 // Mock credentials for demo
 const DEMO_ACCOUNTS = [
   {
-    email: 'fatima.manuel@transbook.ao',
-    name: 'Fátima Manuel (Cliente)',
+    email: 'paulorosy923@gmail.com',
+    name: 'Rosy Paulo (Cliente)',
     role: 'cliente',
     icon: '👤',
   },
@@ -34,9 +34,9 @@ const DEMO_ACCOUNTS = [
     icon: '🛡️',
   },
   {
-    email: 'macon.operator@transbook.ao',
-    name: 'Macon Operador (Operador Macon)',
-    role: 'operador',
+    email: 'jordanpedro2005@gmail.com',
+    name: 'Jordan Pedro (Operador Macon)',
+    role: 'Gerente',
     icon: '🚌',
   },
 ];
@@ -91,7 +91,6 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
 
-    // 1. Try backend authentication first
     try {
       const res = await fetch('http://localhost:8000/api/auth/login/', {
         method: 'POST',
@@ -102,10 +101,10 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
         }),
       });
 
-      if (res.ok) {
-        const backendData = await res.json();
-        setIsLoading(false);
+      const backendData = await res.json();
+      setIsLoading(false);
 
+      if (res.ok) {
         const loggedUser = {
           email: backendData.user.email,
           name: backendData.user.name,
@@ -122,6 +121,7 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
           company_id: backendData.user.company_id,
           company_code: backendData.user.company_code,
           company_status: backendData.user.company_status,
+          token: backendData.token,
         };
         localStorage.setItem('nzila_current_user', JSON.stringify(loggedUser));
         window.dispatchEvent(new Event('storage'));
@@ -131,122 +131,15 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
         });
 
         redirectUser(loggedUser.role);
-        return;
+      } else {
+        setError('email', {
+          message: backendData.error || 'Credenciais inválidas.',
+        });
       }
     } catch (error) {
-      console.warn('Backend login unavailable, falling back to local auth:', error);
-    }
-
-    // 2. Offline / Local fallback authentication
-    const selectedAccount = DEMO_ACCOUNTS.find((acc) => acc.email === data.email);
-
-    let localCarrierUser: any = null;
-    const storedCarriers = localStorage.getItem('nzila_carriers');
-    if (storedCarriers) {
-      try {
-        const carriersList = JSON.parse(storedCarriers);
-        for (const carrier of carriersList) {
-          const admin = carrier.admins?.find((a: any) => a.email === data.email);
-          if (admin) {
-            localCarrierUser = {
-              email: admin.email,
-              name: admin.nome,
-              phone: admin.telefone,
-              document: admin.documento_identificacao || '002345678LA099',
-              avatar:
-                'https://images.unsplash.com/photo-1557683316-973673baf926?w=150&auto=format&fit=crop&q=60',
-              isAdmin: false,
-              role: 'OPERADOR',
-              company_id: carrier.id,
-              company_code: carrier.nome.substring(0, 5).toUpperCase(),
-              company_status: carrier.status,
-            };
-            break;
-          }
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    if (!selectedAccount && !localCarrierUser) {
       setIsLoading(false);
-      setError('email', {
-        message: 'Credenciais inválidas — registe-se primeiro ou use as contas demo.',
-      });
-      return;
+      toast.error('Ocorreu um erro de ligação ao servidor do backend.');
     }
-
-    if (data.password !== DEMO_PASSWORD && (!localCarrierUser || data.password === '')) {
-      setIsLoading(false);
-      setError('password', {
-        message: 'Palavra-passe incorreta para demonstração.',
-      });
-      return;
-    }
-
-    setIsLoading(false);
-
-    let loggedUser: any;
-    if (localCarrierUser) {
-      loggedUser = localCarrierUser;
-    } else if (selectedAccount) {
-      loggedUser = {
-        email: selectedAccount.email,
-        name: selectedAccount.name.split(' (')[0],
-        phone:
-          selectedAccount.role === 'admin'
-            ? '+244 912 999 888'
-            : selectedAccount.role === 'fiscal'
-              ? '+244 933 222 111'
-              : selectedAccount.role === 'operador'
-                ? '+244 923 101 010'
-                : '+244 923 456 789',
-        document:
-          selectedAccount.role === 'admin'
-            ? '008765432LA099'
-            : selectedAccount.role === 'fiscal'
-              ? '009876543LA077'
-              : selectedAccount.role === 'operador'
-                ? '002345678LA099'
-                : '005432168LA045',
-        avatar:
-          selectedAccount.role === 'admin'
-            ? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80'
-            : selectedAccount.role === 'fiscal'
-              ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80'
-              : selectedAccount.role === 'operador'
-                ? 'https://images.unsplash.com/photo-1557683316-973673baf926?w=150&auto=format&fit=crop&q=60'
-                : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-        isAdmin: selectedAccount.role === 'admin',
-        role: selectedAccount.role === 'operador' ? 'OPERADOR' : selectedAccount.role,
-        company_id:
-          selectedAccount.role === 'operador'
-            ? 1
-            : selectedAccount.role === 'fiscal'
-              ? 2
-              : undefined,
-        company_code:
-          selectedAccount.role === 'operador'
-            ? 'MACON'
-            : selectedAccount.role === 'fiscal'
-              ? 'TRANSLUX'
-              : undefined,
-        company_status: selectedAccount.role === 'operador' ? 'APROVADA' : undefined,
-      };
-    } else {
-      setIsLoading(false);
-      return;
-    }
-
-    localStorage.setItem('nzila_current_user', JSON.stringify(loggedUser));
-    window.dispatchEvent(new Event('storage'));
-
-    toast.success('Autenticação realizada com sucesso!', {
-      description: `Bem-vindo, ${loggedUser.name}!`,
-    });
-
-    redirectUser(loggedUser.role);
   };
 
   const redirectUser = (role: string) => {

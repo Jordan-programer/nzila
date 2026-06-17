@@ -19,6 +19,7 @@ from .models import (
 )
 from .serializers import (
     UserSerializer,
+    FiscalSerializer,
     TripSerializer,
     ReservationSerializer,
     LocationSerializer,
@@ -27,6 +28,7 @@ from .serializers import (
     CompanyAdminSerializer,
     NotificationSerializer,
     PopularRouteSerializer,
+    BusSerializer,
 )
 
 # ----------------------------------------------------
@@ -699,6 +701,11 @@ def verify_carrier_otp(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def upload_carrier_document(request):
+    import base64
+    import time
+    from django.core.files.base import ContentFile
+    from django.core.files.storage import default_storage
+
     data = request.data
     company_id = data.get('company_id')
     tipo = data.get('tipo')
@@ -711,6 +718,25 @@ def upload_carrier_document(request):
         company = Company.objects.get(pk=company_id)
     except Company.DoesNotExist:
         return Response({'error': 'Transportadora não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Convert base64 data URL to media file if applicable
+    if arquivo_url.startswith('data:'):
+        try:
+            parts = arquivo_url.split(';base64,')
+            if len(parts) == 2:
+                format_part, data_str = parts
+                ext = 'pdf'
+                if 'png' in format_part.lower():
+                    ext = 'png'
+                elif 'jpg' in format_part.lower() or 'jpeg' in format_part.lower():
+                    ext = 'jpg'
+                
+                data_bytes = base64.b64decode(data_str)
+                filename = f"company_docs/company_{company_id}_{tipo}_{int(time.time())}.{ext}"
+                file_path = default_storage.save(filename, ContentFile(data_bytes))
+                arquivo_url = f"http://localhost:8000/media/{file_path}"
+        except Exception as e:
+            print(f"Error saving base64 document: {e}")
 
     doc = CompanyDocument.objects.create(
         company=company,
@@ -781,7 +807,7 @@ def admin_review_carrier(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def admin_list_carriers(request):
-    companies = Company.objects.all().order_by('-created_at')
+    companies = Company.objects.all().prefetch_related('documents', 'admins').order_by('-created_at')
     
     result = []
     for c in companies:
@@ -843,22 +869,36 @@ def carrier_manage_buses(request, pk=None):
 
     if request.method == 'POST':
         modelo = request.data.get('modelo')
-        capacidade = request.data.get('capacidade')
+        matricula = request.data.get('matricula', '')
+        colunas_esquerda = int(request.data.get('colunas_esquerda', 2))
+        colunas_direita = int(request.data.get('colunas_direita', 2))
+        linhas = int(request.data.get('linhas', 11))
+        capacidade = (colunas_esquerda + colunas_direita) * linhas
         
-        if not modelo or not capacidade:
-            return Response({'error': 'Preencha o modelo e capacidade do autocarro.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not modelo:
+            return Response({'error': 'Preencha o modelo do autocarro.'}, status=status.HTTP_400_BAD_REQUEST)
+        if colunas_esquerda < 1 or colunas_direita < 1 or linhas < 1:
+            return Response({'error': 'Configuração de assentos inválida.'}, status=status.HTTP_400_BAD_REQUEST)
             
         bus = Bus.objects.create(
             empresa_id=company_id,
             modelo=modelo,
-            capacidade=int(capacidade)
+            matricula=matricula,
+            capacidade=capacidade,
+            colunas_esquerda=colunas_esquerda,
+            colunas_direita=colunas_direita,
+            linhas=linhas
         )
         
+        # Generate seats from layout: left columns first (A, B...), then right columns
+        left_letters = [chr(65 + i) for i in range(colunas_esquerda)]
+        right_letters = [chr(65 + colunas_esquerda + i) for i in range(colunas_direita)]
+        all_letters = left_letters + right_letters  # e.g. ['A','B','C','D']
+        
         seats_to_create = []
-        for i in range(1, bus.capacidade + 1):
-            seat_num = f"{(i-1)//4 + 1:02d}"
-            seat_letter = chr(65 + ((i - 1) % 4))
-            seats_to_create.append(Seat(bus=bus, numero=f"{seat_num}{seat_letter}"))
+        for row in range(1, linhas + 1):
+            for letter in all_letters:
+                seats_to_create.append(Seat(bus=bus, numero=f"{row:02d}{letter}"))
         Seat.objects.bulk_create(seats_to_create)
         
         serializer = BusSerializer(bus)
@@ -871,15 +911,33 @@ def carrier_manage_buses(request, pk=None):
             return Response({'error': 'Autocarro não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
             
         bus.modelo = request.data.get('modelo', bus.modelo)
-        capacidade = request.data.get('capacidade')
-        if capacidade and int(capacidade) != bus.capacidade:
-            bus.capacidade = int(capacidade)
+        bus.matricula = request.data.get('matricula', bus.matricula)
+        
+        # Check if layout is changing
+        new_col_esq = request.data.get('colunas_esquerda')
+        new_col_dir = request.data.get('colunas_direita')
+        new_linhas = request.data.get('linhas')
+        
+        layout_changed = (
+            (new_col_esq is not None and int(new_col_esq) != bus.colunas_esquerda) or
+            (new_col_dir is not None and int(new_col_dir) != bus.colunas_direita) or
+            (new_linhas is not None and int(new_linhas) != bus.linhas)
+        )
+        
+        if layout_changed:
+            bus.colunas_esquerda = int(new_col_esq) if new_col_esq else bus.colunas_esquerda
+            bus.colunas_direita = int(new_col_dir) if new_col_dir else bus.colunas_direita
+            bus.linhas = int(new_linhas) if new_linhas else bus.linhas
+            bus.capacidade = (bus.colunas_esquerda + bus.colunas_direita) * bus.linhas
+            
             bus.seats.all().delete()
+            left_letters = [chr(65 + i) for i in range(bus.colunas_esquerda)]
+            right_letters = [chr(65 + bus.colunas_esquerda + i) for i in range(bus.colunas_direita)]
+            all_letters = left_letters + right_letters
             seats_to_create = []
-            for i in range(1, bus.capacidade + 1):
-                seat_num = f"{(i-1)//4 + 1:02d}"
-                seat_letter = chr(65 + ((i - 1) % 4))
-                seats_to_create.append(Seat(bus=bus, numero=f"{seat_num}{seat_letter}"))
+            for row in range(1, bus.linhas + 1):
+                for letter in all_letters:
+                    seats_to_create.append(Seat(bus=bus, numero=f"{row:02d}{letter}"))
             Seat.objects.bulk_create(seats_to_create)
             
         bus.save()
@@ -1271,4 +1329,104 @@ def upload_company_logo(request):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+# ----------------------------------------------------
+# Carrier Fiscais Management (Inspectors)
+# ----------------------------------------------------
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def carrier_manage_fiscais(request, pk=None):
+    """CRUD para fiscais da transportadora"""
+    company_id = request.data.get('company_id') or request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
 
+    if not company_id:
+        return Response({'error': 'Identificação da transportadora em falta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == 'GET':
+        fiscais = UserProfile.objects.filter(company_id=company_id, role='FISCAL').order_by('nome')
+        serializer = FiscalSerializer(fiscais, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == 'POST':
+        nome = request.data.get('nome', '').strip()
+        email = request.data.get('email', '').strip()
+        telefone = request.data.get('telefone', '')
+        document = request.data.get('document', '')
+        password = request.data.get('password', '')
+
+        if not nome or not email or not password:
+            return Response({'error': 'Nome, email e palavra-passe são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(username=email).exists():
+            return Response({'error': 'Já existe um utilizador com este email.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            company = Company.objects.get(pk=company_id)
+        except Company.DoesNotExist:
+            return Response({'error': 'Transportadora não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password,
+            first_name=nome.split(' ')[0],
+            last_name=nome.split(' ')[1] if ' ' in nome else ''
+        )
+        profile = UserProfile.objects.create(
+            user=user,
+            nome=nome,
+            email=email,
+            telefone=telefone,
+            document=document,
+            role='FISCAL',
+            company=company
+        )
+
+        # Notify the new fiscal
+        Notification.objects.create(
+            user=user,
+            tipo='CONFIRMACAO',
+            mensagem=f"Conta de fiscal criada para a transportadora '{company.nome}'. Use este email para iniciar sessão na aplicação móvel de validação.",
+            enviado=True
+        )
+
+        serializer = FiscalSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    if request.method == 'PUT':
+        try:
+            profile = UserProfile.objects.get(pk=pk, company_id=company_id, role='FISCAL')
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Fiscal não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        nome = request.data.get('nome', profile.nome).strip()
+        telefone = request.data.get('telefone', profile.telefone or '')
+        document = request.data.get('document', profile.document or '')
+        new_password = request.data.get('password', '')
+
+        profile.nome = nome
+        profile.telefone = telefone
+        profile.document = document
+        profile.save()
+
+        # Also update the linked Django user name
+        profile.user.first_name = nome.split(' ')[0]
+        profile.user.last_name = nome.split(' ')[1] if ' ' in nome else ''
+        if new_password:
+            profile.user.set_password(new_password)
+        profile.user.save()
+
+        serializer = FiscalSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == 'DELETE':
+        try:
+            profile = UserProfile.objects.get(pk=pk, company_id=company_id, role='FISCAL')
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Fiscal não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = profile.user
+        profile.delete()
+        user.delete()
+        return Response({'success': 'Fiscal removido com sucesso.'}, status=status.HTTP_200_OK)

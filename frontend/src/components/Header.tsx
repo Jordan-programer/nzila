@@ -21,19 +21,46 @@ export default function Header() {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
+  const getDashboardLink = (): string => {
+    if (!user) return '/';
+    const role = user.role?.toLowerCase();
+    if (role === 'admin') return '/admin';
+    if (role === 'operador' || role === 'operator') return '/operator';
+    if (role === 'fiscal') return '/validation';
+    return '/client';
+  };
+
   // Returns the link target if this notification is a carrier-registration notification for admin
   const getNotifLink = (n: any): string | null => {
-    if (user?.role !== 'admin') return null;
-    const text = ((n.subject || '') + ' ' + (n.snippet || '')).toLowerCase();
-    if (
-      text.includes('transportadora') ||
-      text.includes('candidatura') ||
-      text.includes('carrier') ||
-      text.includes('nova empresa')
-    ) {
-      return '/admin?tab=empresas';
+    if (!user) return null;
+    const role = user.role?.toLowerCase();
+    
+    // Admin checks
+    if (role === 'admin') {
+      const text = ((n.subject || '') + ' ' + (n.snippet || '')).toLowerCase();
+      if (
+        text.includes('transportadora') ||
+        text.includes('candidatura') ||
+        text.includes('carrier') ||
+        text.includes('nova empresa')
+      ) {
+        return '/admin?tab=empresas';
+      }
+      return '/admin';
     }
-    return null;
+    
+    // Operator checks
+    if (role === 'operador' || role === 'operator') {
+      return '/operator';
+    }
+    
+    // Fiscal checks
+    if (role === 'fiscal') {
+      return '/validation';
+    }
+    
+    // Client checks (default)
+    return '/client';
   };
 
   useEffect(() => {
@@ -60,16 +87,6 @@ export default function Header() {
         }
       }
 
-      let localNotifs: any[] = [];
-      const storedLocal = localStorage.getItem('nzila_simulated_emails');
-      if (storedLocal) {
-        try {
-          localNotifs = JSON.parse(storedLocal);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-
       if (userEmail) {
         try {
           const res = await fetch(
@@ -89,20 +106,15 @@ export default function Header() {
               snippet: item.mensagem,
               sentAt: item.created_at,
             }));
-
-            const combined = [...backendNotifs, ...localNotifs];
-            const unique = combined.filter(
-              (notif, idx, self) => self.findIndex((n) => n.snippet === notif.snippet) === idx
-            );
-            setNotifications(unique);
+            setNotifications(backendNotifs);
             return;
           }
         } catch (error) {
-          console.warn('Backend notifications endpoint unreachable, using local fallback:', error);
+          console.warn('Backend notifications endpoint unreachable:', error);
         }
       }
 
-      setNotifications(localNotifs);
+      setNotifications([]);
     };
 
     checkUser();
@@ -157,7 +169,7 @@ export default function Header() {
             ))}
 
             {/* Dynamic perspective links based on role */}
-            {user?.role === 'admin' && (
+            {user?.role?.toLowerCase() === 'admin' && (
               <>
                 <span className="h-4 w-px bg-border mx-2" />
                 <Link
@@ -186,7 +198,7 @@ export default function Header() {
               </>
             )}
 
-            {user?.role === 'fiscal' && (
+            {user?.role?.toLowerCase() === 'fiscal' && (
               <>
                 <span className="h-4 w-px bg-border mx-2" />
                 <Link
@@ -256,7 +268,9 @@ export default function Header() {
                                 </p>
                                 {isClickable && (
                                   <span className="flex items-center gap-0.5 text-[9px] text-primary font-bold mt-0.5">
-                                    Ver transportadoras pendentes
+                                    {link.includes('tab=empresas')
+                                      ? 'Ver transportadoras pendentes'
+                                      : 'Ir para o painel'}
                                     <ArrowRight size={9} />
                                   </span>
                                 )}
@@ -296,9 +310,9 @@ export default function Header() {
                 </div>
 
                 <Link
-                  href="/client"
+                  href={getDashboardLink()}
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all duration-150 ${
-                    pathname.startsWith('/client')
+                    pathname.startsWith(getDashboardLink())
                       ? 'bg-primary/15 text-primary'
                       : 'text-foreground hover:text-primary hover:bg-primary/5'
                   }`}
@@ -378,7 +392,9 @@ export default function Header() {
                               </p>
                               {isClickable && (
                                 <span className="flex items-center gap-0.5 text-[8px] text-primary font-bold mt-0.5">
-                                  Ver transportadoras pendentes
+                                  {link.includes('tab=empresas')
+                                    ? 'Ver transportadoras pendentes'
+                                    : 'Ir para o painel'}
                                   <ArrowRight size={8} />
                                 </span>
                               )}
@@ -450,7 +466,7 @@ export default function Header() {
             </Link>
           ))}
 
-          {user?.role === 'admin' && (
+          {user?.role?.toLowerCase() === 'admin' && (
             <div className="pt-2 border-t border-border flex flex-col gap-1.5">
               <Link
                 href="/admin"
@@ -475,7 +491,7 @@ export default function Header() {
             </div>
           )}
 
-          {user?.role === 'fiscal' && (
+          {user?.role?.toLowerCase() === 'fiscal' && (
             <div className="pt-2 border-t border-border flex flex-col gap-1.5">
               <Link
                 href="/validation"
@@ -498,12 +514,12 @@ export default function Header() {
             {user ? (
               <div className="flex flex-col gap-2">
                 <Link
-                  href="/client"
+                  href={getDashboardLink()}
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary/10 text-primary"
                 >
                   <User size={16} />
-                  <span>Área do Cliente: {user.name}</span>
+                  <span>Olá, {user.name.split(' ')[0]}</span>
                 </Link>
                 <button
                   onClick={() => {

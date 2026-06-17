@@ -4,9 +4,28 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { MOCK_TRIPS, Trip } from '@/app/results-page/components/mockTrips';
-import { createReservation, getCurrentUser } from '@/app/components/mockDb';
+
 import { toast } from 'sonner';
+
+interface Trip {
+  id: string | number;
+  carrier: string;
+  carrierCode: string;
+  carrierColor: string;
+  rating: number;
+  reviews: number;
+  origin: string;
+  destination: string;
+  departureTime: string;
+  arrivalTime: string;
+  durationLabel: string;
+  class: string;
+  classLabel: string;
+  availableSeats: number;
+  totalSeats: number;
+  price: number;
+  amenities: string[];
+}
 import {
   User,
   CreditCard,
@@ -79,43 +98,39 @@ function CheckoutContent() {
     setUnitelPhone(user.phone?.replace('+244 ', '') || '');
     setPaypayPhone(user.phone?.replace('+244 ', '') || '');
 
-    // 2. Load trip
+    // 2. Load trip from backend API
     if (!tripId) {
       toast.error('Nenhuma viagem selecionada!');
       router.push('/results-page');
       return;
     }
 
-    const selectedTrip = MOCK_TRIPS.find((t) => t.id === tripId);
-    if (!selectedTrip) {
-      toast.error('Viagem não encontrada.');
-      router.push('/results-page');
-      return;
-    }
-    setTrip(selectedTrip);
+    const fetchTrip = async () => {
+      try {
+        const res = await fetch(`http://localhost:8000/api/trips/${tripId}/`);
+        if (!res.ok) throw new Error('Viagem não encontrada no servidor.');
+        const data = await res.json();
+        setTrip(data);
+        
+        // Load occupied seats dynamically from API
+        setOccupiedSeats(data.occupiedSeats || []);
 
-    // Generate random occupied seats for illustration
-    const numSeats =
-      selectedTrip.class === 'vip' ? 12 : selectedTrip.class === 'executiva' ? 28 : 44;
-    const occupied: string[] = [];
-    for (let i = 1; i <= numSeats; i++) {
-      const seatNum = i < 10 ? `0${i}` : `${i}`;
-      const seatLabel = `${seatNum}${String.fromCharCode(65 + (i % 4))}`;
-      if (Math.random() < 0.4 && occupied.length < numSeats - selectedTrip.availableSeats) {
-        occupied.push(seatLabel);
+        // Setup Reference details
+        const randomRef = Math.floor(100000000 + Math.random() * 900000000)
+          .toString()
+          .replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
+        setMockRef({
+          entidad: '00294',
+          ref: randomRef,
+          valor: data.price,
+        });
+      } catch (err: any) {
+        toast.error(err.message || 'Erro ao carregar detalhes da viagem.');
+        router.push('/results-page');
       }
-    }
-    setOccupiedSeats(occupied);
+    };
 
-    // Setup Reference details
-    const randomRef = Math.floor(100000000 + Math.random() * 900000000)
-      .toString()
-      .replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
-    setMockRef({
-      entidad: '00294',
-      ref: randomRef,
-      valor: selectedTrip.price,
-    });
+    fetchTrip();
   }, [tripId, router]);
 
   // Express countdown timer
@@ -175,7 +190,7 @@ function CheckoutContent() {
     let currentIdx = 0;
     setProcessingMessage(messages[0]);
 
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       currentIdx++;
       if (currentIdx < messages.length) {
         setProcessingMessage(messages[currentIdx]);
@@ -184,36 +199,47 @@ function CheckoutContent() {
 
         // Save reservation in DB
         if (trip) {
-          const res = createReservation({
-            tripId: trip.id,
-            passengerName,
-            passengerEmail,
-            passengerPhone,
-            passengerDocument,
-            origin: trip.origin,
-            destination: trip.destination,
-            date: new Date().toISOString().split('T')[0], // Today's date
-            departureTime: trip.departureTime,
-            arrivalTime: trip.arrivalTime,
-            class: trip.class,
-            classLabel: trip.classLabel,
-            seat: selectedSeat,
-            price: trip.price,
-            carrier: trip.carrier,
-            carrierCode: trip.carrierCode,
-            carrierColor: trip.carrierColor,
-            paymentMethod:
-              paymentMethod === 'express'
-                ? 'Multicaixa Express'
-                : paymentMethod === 'referencia'
-                  ? 'Pagamento por referência'
-                  : paymentMethod === 'unitel'
-                    ? 'Unitel Money'
-                    : 'PayPay',
-          });
+          const user = getCurrentUser();
+          const token = user?.token;
 
-          toast.success('Reserva confirmada com sucesso!');
-          router.push(`/confirmation?code=${res.id}`);
+          try {
+            const res = await fetch('http://localhost:8000/api/reservations/', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Token ${token}`,
+              },
+              body: JSON.stringify({
+                tripId: trip.id,
+                seat: selectedSeat,
+                paymentMethod:
+                  paymentMethod === 'express'
+                    ? 'Multicaixa Express'
+                    : paymentMethod === 'referencia'
+                      ? 'Pagamento por referência'
+                      : paymentMethod === 'unitel'
+                        ? 'Unitel Money'
+                        : 'PayPay',
+                passengerName,
+                passengerEmail,
+                passengerPhone,
+                passengerDocument,
+              }),
+            });
+
+            const resData = await res.json();
+
+            if (res.ok) {
+              toast.success('Reserva confirmada com sucesso!');
+              router.push(`/confirmation?code=${resData.codigo_reserva}`);
+            } else {
+              toast.error(resData.error || 'Erro ao realizar reserva no servidor.');
+              setLoading(false);
+            }
+          } catch (err) {
+            toast.error('Erro ao comunicar com o servidor.');
+            setLoading(false);
+          }
         }
       }
     }, 1200);
