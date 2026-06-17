@@ -19,6 +19,6 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: ${{ secrets.PORT || 22 }}
           script: |
-            cd /root/var/www/nzila
+            cd root/var/www/nzila
             git pull origin main
             ./deploy.sh
