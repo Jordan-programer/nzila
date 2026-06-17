@@ -90,7 +90,7 @@ export default function Header() {
       if (userEmail) {
         try {
           const res = await fetch(
-            `http://localhost:8000/api/notifications/?email=${encodeURIComponent(userEmail)}`
+            `/api/notifications/?email=${encodeURIComponent(userEmail)}`
           );
           if (res.ok) {
             const data = await res.json();

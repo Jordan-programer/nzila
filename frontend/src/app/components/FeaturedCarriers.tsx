@@ -10,7 +10,7 @@ export default function FeaturedCarriers() {
   useEffect(() => {
     async function fetchCarriers() {
       try {
-        const res = await fetch('http://localhost:8000/api/public/carriers/');
+        const res = await fetch('/api/public/carriers/');
         if (!res.ok) throw new Error('API Error');
         const data = await res.json();
         const mapped = data.map((c: any) => ({
@@ -23,7 +23,7 @@ export default function FeaturedCarriers() {
           color: c.color || 'bg-blue-600',
           textColor: 'text-white',
           description: c.descricao || 'Empresa parceira oficial da rede de transportes Nzila.',
-          logo: c.logo ? (c.logo.startsWith('http') ? c.logo : `http://localhost:8000${c.logo}`) : '',
+          logo: c.logo ? (c.logo.startsWith('http') ? c.logo : `${c.logo}`) : '',
         }));
         setCarriers(mapped);
       } catch (err) {

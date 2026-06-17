@@ -43,7 +43,7 @@ export default function ResultsContent() {
     const fetchTrips = async () => {
       setIsLoading(true);
       try {
-        let url = 'http://localhost:8000/api/trips/';
+        let url = '/api/trips/';
         const queryParams = new URLSearchParams();
         if (originQuery) queryParams.append('origin', originQuery);
         if (destQuery) queryParams.append('destination', destQuery);

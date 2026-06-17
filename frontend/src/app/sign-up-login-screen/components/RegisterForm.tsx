@@ -279,7 +279,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
   const onSubmitPassenger = async (data: RegisterFormData) => {
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/auth/send-client-otp/', {
+      const res = await fetch('/api/auth/send-client-otp/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -324,7 +324,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
 
     setIsLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/auth/register/', {
+      const res = await fetch('/api/auth/register/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -378,7 +378,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
     setIsResendingClientOtp(true);
 
     try {
-      const res = await fetch('http://localhost:8000/api/auth/send-client-otp/', {
+      const res = await fetch('/api/auth/send-client-otp/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -514,7 +514,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
     if (resendCooldown > 0 || isResending) return;
     setIsResending(true);
     try {
-      const res = await fetch('http://localhost:8000/api/auth/resend-otp/', {
+      const res = await fetch('/api/auth/resend-otp/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: respEmail }),
@@ -604,7 +604,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
 
     try {
       // Backend request
-      const res = await fetch('http://localhost:8000/api/auth/register-carrier/', {
+      const res = await fetch('/api/auth/register-carrier/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -626,7 +626,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
       if (docEstatutos) docs.push({ tipo: 'ESTATUTOS', arquivo_url: docEstatutos });
 
       for (const d of docs) {
-        await fetch('http://localhost:8000/api/auth/upload-document/', {
+        await fetch('/api/auth/upload-document/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -663,7 +663,7 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
     setIsSubmittingCarrier(true);
 
     try {
-      const res = await fetch('http://localhost:8000/api/auth/verify-otp/', {
+      const res = await fetch('/api/auth/verify-otp/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ otp: otpCode }),

@@ -75,7 +75,7 @@ export default function MobileValidationApp() {
 
   const loadReservations = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/reservations/');
+      const res = await fetch('/api/admin/reservations/');
       if (res.ok) {
         const data = await res.json();
         setReservations(data);
@@ -148,7 +148,7 @@ export default function MobileValidationApp() {
         let successCount = 0;
         for (const code of offlineQueue) {
           try {
-            const res = await fetch('http://localhost:8000/api/validation/confirm/', {
+            const res = await fetch('/api/validation/confirm/', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ code }),
@@ -232,7 +232,7 @@ export default function MobileValidationApp() {
 
     // Online mode: call the backend scan API
     try {
-      const res = await fetch('http://localhost:8000/api/validation/scan/', {
+      const res = await fetch('/api/validation/scan/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: code.trim() }),
@@ -292,7 +292,7 @@ export default function MobileValidationApp() {
       } else {
         // Direct API confirmation
         try {
-          const res = await fetch('http://localhost:8000/api/validation/confirm/', {
+          const res = await fetch('/api/validation/confirm/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code: resultTicket.id }),

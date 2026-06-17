@@ -107,7 +107,7 @@ function CheckoutContent() {
 
     const fetchTrip = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/trips/${tripId}/`);
+        const res = await fetch(`/api/trips/${tripId}/`);
         if (!res.ok) throw new Error('Viagem não encontrada no servidor.');
         const data = await res.json();
         setTrip(data);
@@ -203,7 +203,7 @@ function CheckoutContent() {
           const token = user?.token;
 
           try {
-            const res = await fetch('http://localhost:8000/api/reservations/', {
+            const res = await fetch('/api/reservations/', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

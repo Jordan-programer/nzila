@@ -21,7 +21,7 @@ export default function AuthCallbackPage() {
           // Map Supabase user metadata to Nzila session structure using the backend
           let loggedUser;
           try {
-            const response = await fetch('http://localhost:8000/api/auth/social-login/', {
+            const response = await fetch('/api/auth/social-login/', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

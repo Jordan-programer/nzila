@@ -11,7 +11,7 @@ export default function PopularRoutes() {
   useEffect(() => {
     async function fetchPopularRoutes() {
       try {
-        const res = await fetch('http://localhost:8000/api/public/popular-routes/');
+        const res = await fetch('/api/public/popular-routes/');
         if (!res.ok) throw new Error('API Error');
         const data = await res.json();
         const mapped = data.map((r: any) => ({
@@ -22,7 +22,7 @@ export default function PopularRoutes() {
           priceFrom: parseFloat(r.preco_desde),
           trending: r.trending,
           frequency: r.frequencia,
-          image: r.imagem ? (r.imagem.startsWith('http') ? r.imagem : `http://localhost:8000${r.imagem}`) : '',
+          image: r.imagem ? (r.imagem.startsWith('http') ? r.imagem : `${r.imagem}`) : '',
           gradient: 'bg-gradient-to-br from-blue-500 to-blue-700', // default gradient fallback
         }));
         setRoutes(mapped);

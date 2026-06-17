@@ -74,7 +74,7 @@ function ConfirmationContent() {
 
     const fetchReservation = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/reservations/${code}/`);
+        const res = await fetch(`/api/reservations/${code}/`);
         if (!res.ok) throw new Error('Reserva não encontrada no sistema.');
         const data = await res.json();
         setReservation(data);

@@ -108,7 +108,7 @@ export default function TicketValidationPage() {
     setScannedTicket(null);
 
     try {
-      const res = await fetch('http://localhost:8000/api/validation/scan/', {
+      const res = await fetch('/api/validation/scan/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: codeToValidate.trim() }),
@@ -161,7 +161,7 @@ export default function TicketValidationPage() {
   const handleConfirmBoarding = async () => {
     if (scannedTicket && validationResult === 'VALID') {
       try {
-        const res = await fetch('http://localhost:8000/api/validation/confirm/', {
+        const res = await fetch('/api/validation/confirm/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: scannedTicket.id }),

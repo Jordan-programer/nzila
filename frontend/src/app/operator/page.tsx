@@ -193,7 +193,7 @@ export default function OperatorDashboardPage() {
 
     // 1. Fetch Company Info
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/info/?company_id=${companyId}`);
+      const res = await fetch(`/api/carrier/info/?company_id=${companyId}`);
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setCompany(data);
@@ -205,7 +205,7 @@ export default function OperatorDashboardPage() {
 
     // 2. Fetch Locations (for route creation)
     try {
-      const res = await fetch('http://localhost:8000/api/locations/');
+      const res = await fetch('/api/locations/');
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setLocations(data);
@@ -215,7 +215,7 @@ export default function OperatorDashboardPage() {
 
     // 3. Fetch Buses
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/buses/?company_id=${companyId}`);
+      const res = await fetch(`/api/carrier/buses/?company_id=${companyId}`);
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setBuses(data);
@@ -225,7 +225,7 @@ export default function OperatorDashboardPage() {
 
     // 4. Fetch Routes
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/routes/`);
+      const res = await fetch(`/api/carrier/routes/`);
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setRoutes(data);
@@ -235,7 +235,7 @@ export default function OperatorDashboardPage() {
 
     // 5. Fetch Trips
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/trips/?company_id=${companyId}`);
+      const res = await fetch(`/api/carrier/trips/?company_id=${companyId}`);
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setTrips(data);
@@ -245,7 +245,7 @@ export default function OperatorDashboardPage() {
 
     // 6. Fetch Fiscais
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/fiscais/?company_id=${companyId}`);
+      const res = await fetch(`/api/carrier/fiscais/?company_id=${companyId}`);
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setFiscais(data);
@@ -279,7 +279,7 @@ export default function OperatorDashboardPage() {
     };
 
     try {
-      const res = await fetch('http://localhost:8000/api/carrier/buses/', {
+      const res = await fetch('/api/carrier/buses/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -313,7 +313,7 @@ export default function OperatorDashboardPage() {
 
     try {
       const res = await fetch(
-        `http://localhost:8000/api/carrier/buses/${busId}/?company_id=${companyId}`,
+        `/api/carrier/buses/${busId}/?company_id=${companyId}`,
         {
           method: 'DELETE',
         }
@@ -361,7 +361,7 @@ export default function OperatorDashboardPage() {
     };
 
     try {
-      const res = await fetch('http://localhost:8000/api/carrier/routes/', {
+      const res = await fetch('/api/carrier/routes/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -383,7 +383,7 @@ export default function OperatorDashboardPage() {
 
   const handleDeleteRoute = async (routeId: number) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/routes/${routeId}/`, {
+      const res = await fetch(`/api/carrier/routes/${routeId}/`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Erro ao ligar ao servidor.');
@@ -430,7 +430,7 @@ export default function OperatorDashboardPage() {
     };
 
     try {
-      const res = await fetch('http://localhost:8000/api/carrier/trips/', {
+      const res = await fetch('/api/carrier/trips/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -460,7 +460,7 @@ export default function OperatorDashboardPage() {
     const companyId = currentUser?.company_id || 1;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/trips/${tripId}/`, {
+      const res = await fetch(`/api/carrier/trips/${tripId}/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CANCELADA', company_id: companyId }),
@@ -476,7 +476,7 @@ export default function OperatorDashboardPage() {
   const handleUpdateTripPrice = async (tripId: number, newPrice: number) => {
     const companyId = currentUser?.company_id || 1;
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/trips/${tripId}/`, {
+      const res = await fetch(`/api/carrier/trips/${tripId}/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ preco_ida: newPrice, company_id: companyId }),
@@ -545,8 +545,8 @@ export default function OperatorDashboardPage() {
 
     try {
       const url = editingFiscal
-        ? `http://localhost:8000/api/carrier/fiscais/${editingFiscal.id}/`
-        : 'http://localhost:8000/api/carrier/fiscais/';
+        ? `/api/carrier/fiscais/${editingFiscal.id}/`
+        : '/api/carrier/fiscais/';
       const method = editingFiscal ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -570,7 +570,7 @@ export default function OperatorDashboardPage() {
     if (!window.confirm('Tem a certeza que deseja remover este fiscal?')) return;
     const companyId = currentUser?.company_id || 1;
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/fiscais/${id}/?company_id=${companyId}`, {
+      const res = await fetch(`/api/carrier/fiscais/${id}/?company_id=${companyId}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Falha ao remover fiscal.');
@@ -594,7 +594,7 @@ export default function OperatorDashboardPage() {
     };
 
     try {
-      const res = await fetch(`http://localhost:8000/api/carrier/info/`, {
+      const res = await fetch(`/api/carrier/info/`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

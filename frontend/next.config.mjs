@@ -10,6 +10,18 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8000/api/:path*',
+      },
+      {
+        source: '/media/:path*',
+        destination: 'http://localhost:8000/media/:path*',
+      },
+    ];
+  },
   images: {
     remotePatterns: imageHosts,
     minimumCacheTTL: 60,

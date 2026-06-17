@@ -97,7 +97,7 @@ export default function ClientDashboardPage() {
   const fetchBackendReservations = async (token: string) => {
     setIsLoadingRes(true);
     try {
-      const res = await fetch('http://localhost:8000/api/reservations/', {
+      const res = await fetch('/api/reservations/', {
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -116,7 +116,7 @@ export default function ClientDashboardPage() {
 
   const fetchBackendNotifications = async (email: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/notifications/?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/notifications/?email=${encodeURIComponent(email)}`);
       if (res.ok) {
         const data = await res.json();
         const mapped = data.map((item: any) => ({
@@ -202,7 +202,7 @@ export default function ClientDashboardPage() {
   const handleConfirmCancellation = async () => {
     if (cancellationTarget && user && (user as any).token) {
       try {
-        const res = await fetch(`http://localhost:8000/api/reservations/${cancellationTarget.id}/cancel/`, {
+        const res = await fetch(`/api/reservations/${cancellationTarget.id}/cancel/`, {
           method: 'POST',
           headers: {
             'Authorization': `Token ${(user as any).token}`

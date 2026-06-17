@@ -139,7 +139,7 @@ function AdminDashboardContent() {
   const fetchCarriers = async () => {
     setIsLoadingCarriers(true);
     try {
-      const res = await fetch('http://localhost:8000/api/admin/carriers/');
+      const res = await fetch('/api/admin/carriers/');
       if (!res.ok) throw new Error('HTTP error');
       const data = await res.json();
       setCarriers(data);
@@ -158,7 +158,7 @@ function AdminDashboardContent() {
     reason = ''
   ) => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/carriers/review/', {
+      const res = await fetch('/api/admin/carriers/review/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -195,7 +195,7 @@ function AdminDashboardContent() {
   const fetchLocations = async () => {
     setIsLoadingLocations(true);
     try {
-      const res = await fetch('http://localhost:8000/api/locations/');
+      const res = await fetch('/api/locations/');
       if (!res.ok) throw new Error('HTTP error');
       const data = await res.json();
       setLocations(data);
@@ -222,7 +222,7 @@ function AdminDashboardContent() {
 
     try {
       if (editingLocation) {
-        const res = await fetch(`http://localhost:8000/api/locations/${editingLocation.id}/`, {
+        const res = await fetch(`/api/locations/${editingLocation.id}/`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -230,7 +230,7 @@ function AdminDashboardContent() {
         if (!res.ok) throw new Error('Failed to update');
         toast.success('Localidade atualizada com sucesso!');
       } else {
-        const res = await fetch('http://localhost:8000/api/locations/', {
+        const res = await fetch('/api/locations/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -251,7 +251,7 @@ function AdminDashboardContent() {
 
   const handleDeleteLocation = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/locations/${id}/`, {
+      const res = await fetch(`/api/locations/${id}/`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Failed to delete');
@@ -266,7 +266,7 @@ function AdminDashboardContent() {
   const fetchPopularRoutes = async () => {
     setIsLoadingPR(true);
     try {
-      const res = await fetch('http://localhost:8000/api/admin/popular-routes/');
+      const res = await fetch('/api/admin/popular-routes/');
       if (!res.ok) throw new Error('HTTP error');
       const data = await res.json();
       setPopularRoutes(data);
@@ -296,11 +296,11 @@ function AdminDashboardContent() {
     }
 
     try {
-      let url = 'http://localhost:8000/api/admin/popular-routes/';
+      let url = '/api/admin/popular-routes/';
       let method = 'POST';
 
       if (editingPopularRoute) {
-        url = `http://localhost:8000/api/admin/popular-routes/${editingPopularRoute.id}/`;
+        url = `/api/admin/popular-routes/${editingPopularRoute.id}/`;
         method = 'PUT';
       }
 
@@ -331,7 +331,7 @@ function AdminDashboardContent() {
 
   const handleDeletePopularRoute = async (id: number) => {
     try {
-      const deleteRes = await fetch(`http://localhost:8000/api/admin/popular-routes/${id}/`, {
+      const deleteRes = await fetch(`/api/admin/popular-routes/${id}/`, {
         method: 'DELETE',
       });
       if (!deleteRes.ok) throw new Error('Failed to delete');
@@ -355,7 +355,7 @@ function AdminDashboardContent() {
     formData.append('logo', selectedLogoFile);
 
     try {
-      const res = await fetch('http://localhost:8000/api/admin/carriers/upload-logo/', {
+      const res = await fetch('/api/admin/carriers/upload-logo/', {
         method: 'POST',
         body: formData,
       });
@@ -374,7 +374,7 @@ function AdminDashboardContent() {
 
   const refreshReservations = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/admin/reservations/');
+      const res = await fetch('/api/admin/reservations/');
       if (res.ok) {
         const data = await res.json();
         setReservations(data);
@@ -464,7 +464,7 @@ function AdminDashboardContent() {
 
   const handleCancelRes = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/reservations/${id}/cancel/`, {
+      const res = await fetch(`/api/reservations/${id}/cancel/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -481,7 +481,7 @@ function AdminDashboardContent() {
 
   const handleRefundRes = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/reservations/${id}/cancel/`, {
+      const res = await fetch(`/api/reservations/${id}/cancel/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -1393,7 +1393,7 @@ function AdminDashboardContent() {
                                         src={
                                           (c.logo_url || c.logo).startsWith('http')
                                             ? (c.logo_url || c.logo)
-                                            : `http://localhost:8000${c.logo_url || c.logo}`
+                                            : `${c.logo_url || c.logo}`
                                         }
                                         alt="Logo"
                                         className="w-full h-full object-contain"
@@ -1783,7 +1783,7 @@ function AdminDashboardContent() {
                               <div className="w-14 h-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center border border-border flex-shrink-0">
                                 {route.imagem ? (
                                   <img
-                                    src={route.imagem.startsWith('http') ? route.imagem : `http://localhost:8000${route.imagem}`}
+                                    src={route.imagem.startsWith('http') ? route.imagem : `${route.imagem}`}
                                     alt={`${route.origin} para ${route.destination}`}
                                     className="w-full h-full object-cover"
                                   />
