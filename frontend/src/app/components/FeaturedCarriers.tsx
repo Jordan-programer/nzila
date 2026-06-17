@@ -55,12 +55,12 @@ export default function FeaturedCarriers() {
               className="bg-card border border-border rounded-2xl overflow-hidden card-hover"
             >
               {/* Logo area */}
-              <div className="h-20 bg-muted flex items-center justify-center p-3 relative overflow-hidden">
+              <div className="h-28 bg-white border-b border-border/50 flex items-center justify-center p-4 relative overflow-hidden transition-all duration-300">
                 {carrier?.logo ? (
                   <img
                     src={carrier?.logo}
                     alt={carrier?.name}
-                    className="h-full object-contain"
+                    className="max-h-16 max-w-full object-contain transition-transform duration-500 hover:scale-105"
                   />
                 ) : (
                   <div className={`absolute inset-0 ${carrier?.color || 'bg-blue-600'} flex items-center justify-center`}>
