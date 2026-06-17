@@ -26,6 +26,8 @@ import {
   X,
   ChevronRight,
   ShieldCheck,
+  Bus as BusIcon,
+  Map,
 } from 'lucide-react';
 
 interface UserSession {
@@ -104,7 +106,9 @@ export default function OperatorDashboardPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [company, setCompany] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'frota' | 'rotas' | 'viagens' | 'fiscais' | 'perfil'>('frota');
+  const [activeTab, setActiveTab] = useState<
+    'frota' | 'localidades' | 'rotas' | 'viagens' | 'fiscais' | 'operadores' | 'perfil'
+  >('frota');
 
   // Loading States
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -125,6 +129,12 @@ export default function OperatorDashboardPage() {
   const [busLinhas, setBusLinhas] = useState(11);
   const busCapacidade = (busColEsq + busColDir) * busLinhas;
 
+  // Localidades (Locations) state
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [locationNome, setLocationNome] = useState('');
+  const [locationProvincia, setLocationProvincia] = useState('');
+
   // Fiscais state
   const [fiscais, setFiscais] = useState<Fiscal[]>([]);
   const [isFiscalModalOpen, setIsFiscalModalOpen] = useState(false);
@@ -134,6 +144,16 @@ export default function OperatorDashboardPage() {
   const [fiscalTelefone, setFiscalTelefone] = useState('');
   const [fiscalDocument, setFiscalDocument] = useState('');
   const [fiscalPassword, setFiscalPassword] = useState('');
+
+  // Operadores state
+  const [operators, setOperators] = useState<any[]>([]);
+  const [isOperatorModalOpen, setIsOperatorModalOpen] = useState(false);
+  const [editingOperator, setEditingOperator] = useState<any | null>(null);
+  const [operatorNome, setOperatorNome] = useState('');
+  const [operatorEmail, setOperatorEmail] = useState('');
+  const [operatorTelefone, setOperatorTelefone] = useState('');
+  const [operatorDocument, setOperatorDocument] = useState('');
+  const [operatorPassword, setOperatorPassword] = useState('');
 
   const [isRouteModalOpen, setIsRouteModalOpen] = useState(false);
   const [routeOrigin, setRouteOrigin] = useState('');
@@ -205,7 +225,7 @@ export default function OperatorDashboardPage() {
 
     // 2. Fetch Locations (for route creation)
     try {
-      const res = await fetch('/api/locations/');
+      const res = await fetch(`/api/locations/?company_id=${companyId}`);
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setLocations(data);
@@ -225,7 +245,7 @@ export default function OperatorDashboardPage() {
 
     // 4. Fetch Routes
     try {
-      const res = await fetch(`/api/carrier/routes/`);
+      const res = await fetch(`/api/carrier/routes/?company_id=${companyId}`);
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setRoutes(data);
@@ -249,6 +269,16 @@ export default function OperatorDashboardPage() {
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setFiscais(data);
+    } catch (err) {
+      // Non-critical, suppress error
+    }
+
+    // 7. Fetch Operators
+    try {
+      const res = await fetch(`/api/carrier/operators/?company_id=${companyId}`);
+      if (!res.ok) throw new Error('API Error');
+      const data = await res.json();
+      setOperators(data);
     } catch (err) {
       // Non-critical, suppress error
     }
@@ -358,6 +388,7 @@ export default function OperatorDashboardPage() {
       destino_id: parseInt(routeDestination),
       distancia_km: parseFloat(routeDistance),
       duracao_estimada: routeDuration,
+      company_id: currentUser?.company_id || 1,
     };
 
     try {
@@ -382,8 +413,9 @@ export default function OperatorDashboardPage() {
   };
 
   const handleDeleteRoute = async (routeId: number) => {
+    const companyId = currentUser?.company_id || 1;
     try {
-      const res = await fetch(`/api/carrier/routes/${routeId}/`, {
+      const res = await fetch(`/api/carrier/routes/${routeId}/?company_id=${companyId}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Erro ao ligar ao servidor.');
@@ -578,6 +610,159 @@ export default function OperatorDashboardPage() {
       fetchCompanyAndOperationalData();
     } catch (err: any) {
       toast.error(err.message || 'Erro ao remover fiscal.');
+    }
+  };
+
+  // LOCALIDADES CRUD
+  const handleOpenLocationModal = (location?: Location) => {
+    if (location) {
+      setEditingLocation(location);
+      setLocationNome(location.nome);
+      setLocationProvincia(location.provincia);
+    } else {
+      setEditingLocation(null);
+      setLocationNome('');
+      setLocationProvincia('');
+    }
+    setIsLocationModalOpen(true);
+  };
+
+  const handleSaveLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const companyId = currentUser?.company_id || 1;
+
+    if (!locationNome.trim() || !locationProvincia.trim()) {
+      toast.error('Nome e província são obrigatórios.');
+      return;
+    }
+
+    const payload = {
+      nome: locationNome.trim(),
+      provincia: locationProvincia.trim(),
+      company_id: companyId,
+    };
+
+    try {
+      const url = editingLocation
+        ? `/api/locations/${editingLocation.id}/`
+        : '/api/locations/';
+      const method = editingLocation ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Falha ao gravar localidade.');
+      }
+      toast.success(editingLocation ? 'Localidade atualizada com sucesso!' : 'Localidade criada com sucesso!');
+      setIsLocationModalOpen(false);
+      fetchCompanyAndOperationalData();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao guardar localidade.');
+    }
+  };
+
+  const handleDeleteLocation = async (id: number) => {
+    if (!window.confirm('Tem a certeza que deseja remover esta localidade? Quaisquer rotas associadas serão removidas.')) return;
+    const companyId = currentUser?.company_id || 1;
+    try {
+      const res = await fetch(`/api/locations/${id}/?company_id=${companyId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Falha ao remover localidade.');
+      }
+      toast.success('Localidade removida com sucesso!');
+      fetchCompanyAndOperationalData();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover localidade.');
+    }
+  };
+
+  // OPERADORES CRUD
+  const handleOpenOperatorModal = (operator?: any) => {
+    if (operator) {
+      setEditingOperator(operator);
+      setOperatorNome(operator.nome);
+      setOperatorEmail(operator.email);
+      setOperatorTelefone(operator.telefone || '');
+      setOperatorDocument(operator.document || '');
+      setOperatorPassword('');
+    } else {
+      setEditingOperator(null);
+      setOperatorNome('');
+      setOperatorEmail('');
+      setOperatorTelefone('');
+      setOperatorDocument('');
+      setOperatorPassword('');
+    }
+    setIsOperatorModalOpen(true);
+  };
+
+  const handleSaveOperator = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const companyId = currentUser?.company_id || 1;
+
+    if (!operatorNome.trim() || !operatorEmail.trim()) {
+      toast.error('Nome e email são obrigatórios.');
+      return;
+    }
+    if (!editingOperator && !operatorPassword.trim()) {
+      toast.error('A palavra-passe é obrigatória ao criar um novo operador.');
+      return;
+    }
+
+    const payload: any = {
+      nome: operatorNome.trim(),
+      email: operatorEmail.trim(),
+      telefone: operatorTelefone.trim(),
+      document: operatorDocument.trim(),
+      company_id: companyId,
+    };
+    if (operatorPassword.trim()) payload.password = operatorPassword.trim();
+
+    try {
+      const url = editingOperator
+        ? `/api/carrier/operators/${editingOperator.id}/`
+        : '/api/carrier/operators/';
+      const method = editingOperator ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Falha ao gravar operador.');
+      }
+      toast.success(editingOperator ? 'Operador atualizado com sucesso!' : 'Operador criado com sucesso!');
+      setIsOperatorModalOpen(false);
+      fetchCompanyAndOperationalData();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao guardar operador.');
+    }
+  };
+
+  const handleDeleteOperator = async (id: number) => {
+    if (!window.confirm('Tem a certeza que deseja remover este operador?')) return;
+    const companyId = currentUser?.company_id || 1;
+    try {
+      const res = await fetch(`/api/carrier/operators/${id}/?company_id=${companyId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Falha ao remover operador.');
+      }
+      toast.success('Operador removido com sucesso!');
+      fetchCompanyAndOperationalData();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover operador.');
     }
   };
 
@@ -1257,6 +1442,167 @@ export default function OperatorDashboardPage() {
         </div>
       )}
 
+      {/* Location Modal */}
+      {isLocationModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in font-sans">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-base font-bold text-foreground">
+                {editingLocation ? 'Editar Localidade' : 'Nova Localidade / Estação'}
+              </h3>
+              <button
+                onClick={() => setIsLocationModalOpen(false)}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveLocation} className="space-y-4 text-sm font-semibold">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nome da Estação / Terminal *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Terminal Macon Huambo"
+                  value={locationNome}
+                  onChange={(e) => setLocationNome(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Província *</label>
+                <select
+                  required
+                  value={locationProvincia}
+                  onChange={(e) => setLocationProvincia(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                >
+                  <option value="">Selecione a Província</option>
+                  {[
+                    'Bengo', 'Benguela', 'Bié', 'Cabinda', 'Cuando Cubango', 'Cuanza Norte',
+                    'Cuanza Sul', 'Cunene', 'Huambo', 'Huíla', 'Luanda', 'Lunda Norte',
+                    'Lunda Sul', 'Malanje', 'Moxico', 'Namibe', 'Uíge', 'Zaire'
+                  ].map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLocationModalOpen(false)}
+                  className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all"
+                >
+                  {editingLocation ? 'Guardar Alterações' : 'Criar Localidade'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Operator Modal */}
+      {isOperatorModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in font-sans">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-base font-bold text-foreground">
+                {editingOperator ? 'Editar Operador' : 'Novo Operador de Bilheteira'}
+              </h3>
+              <button
+                onClick={() => setIsOperatorModalOpen(false)}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveOperator} className="space-y-4 text-sm font-semibold">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nome Completo *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Carlos Mateus Silva"
+                  value={operatorNome}
+                  onChange={(e) => setOperatorNome(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Email {editingOperator ? '(não editável)' : '*'}
+                </label>
+                <input
+                  type="email"
+                  required
+                  disabled={!!editingOperator}
+                  placeholder="operador@transportadora.ao"
+                  value={operatorEmail}
+                  onChange={(e) => setOperatorEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Telefone</label>
+                  <input
+                    type="tel"
+                    placeholder="+244 9XX XXX XXX"
+                    value={operatorTelefone}
+                    onChange={(e) => setOperatorTelefone(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nº Documento (BI)</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: 002345678LA099"
+                    value={operatorDocument}
+                    onChange={(e) => setOperatorDocument(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  {editingOperator ? 'Nova Palavra-Passe (deixar em branco para manter)' : 'Palavra-Passe *'}
+                </label>
+                <input
+                  type="password"
+                  required={!editingOperator}
+                  placeholder="Mínimo 8 caracteres"
+                  value={operatorPassword}
+                  onChange={(e) => setOperatorPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsOperatorModalOpen(false)}
+                  className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all"
+                >
+                  {editingOperator ? 'Guardar Alterações' : 'Criar Operador'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 pt-24 pb-16 font-sans">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           {/* Header Dashboard Banner */}
@@ -1287,10 +1633,12 @@ export default function OperatorDashboardPage() {
             {/* Tabs for Navigation */}
             <div className="flex gap-2 flex-wrap md:flex-nowrap">
               {[
-                { id: 'frota', label: 'Frota', icon: Users },
-                { id: 'rotas', label: 'Rotas', icon: MapPin },
+                { id: 'frota', label: 'Frota', icon: BusIcon },
+                { id: 'localidades', label: 'Localidades', icon: MapPin },
+                { id: 'rotas', label: 'Rotas', icon: Map },
                 { id: 'viagens', label: 'Viagens / Escalas', icon: Calendar },
                 { id: 'fiscais', label: 'Fiscais', icon: ShieldCheck },
+                { id: 'operadores', label: 'Operadores', icon: Users },
                 { id: 'perfil', label: 'Perfil Empresa', icon: Building2 },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -1373,6 +1721,85 @@ export default function OperatorDashboardPage() {
                         >
                           <Trash2 size={14} />
                         </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: LOCALIDADES (LOCATIONS) */}
+          {activeTab === 'localidades' && (
+            <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-border pb-4 flex-wrap gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Minhas Localidades / Estações</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5 font-sans">
+                    Gerencie os seus terminais e pontos de paragem personalizados.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleOpenLocationModal()}
+                  className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-accent transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  <span>Nova Localidade</span>
+                </button>
+              </div>
+
+              {isLoadingData ? (
+                <div className="text-center py-12 text-muted-foreground font-bold">
+                  Carregando localidades...
+                </div>
+              ) : locations.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  Nenhuma localidade registada.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-semibold text-xs">
+                  {locations.map((loc) => {
+                    const isGlobal = !(loc as any).company;
+                    return (
+                      <div
+                        key={`location-${loc.id}`}
+                        className="p-4 bg-muted/20 border border-border rounded-2xl flex items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1">
+                          <span className="block font-bold text-foreground text-sm font-sans">
+                            {loc.nome}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block">
+                            Província: {loc.provincia}
+                          </span>
+                          <span
+                            className={`inline-block text-[8px] px-1.5 py-0.5 rounded-full font-bold ${
+                              isGlobal
+                                ? 'bg-primary/10 text-primary border border-primary/20'
+                                : 'bg-success/10 text-success border border-success/20'
+                            }`}
+                          >
+                            {isGlobal ? 'Global' : 'Personalizada'}
+                          </span>
+                        </div>
+                        
+                        {!isGlobal && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleOpenLocationModal(loc)}
+                              className="px-2 py-1 border border-border text-foreground hover:bg-muted rounded-lg text-[10px]"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLocation(loc.id)}
+                              className="p-1 border border-danger/30 text-danger hover:bg-danger/5 hover:border-danger/55 rounded-lg"
+                              title="Remover Localidade"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1687,6 +2114,83 @@ export default function OperatorDashboardPage() {
                         <button
                           onClick={() => handleDeleteFiscal(fiscal.id)}
                           className="flex-1 py-1.5 border border-danger/25 text-danger hover:bg-danger/5 font-bold rounded-xl text-[10px] transition-colors flex items-center justify-center gap-1"
+                        >
+                          <Trash2 size={10} />
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: OPERADORES */}
+          {activeTab === 'operadores' && (
+            <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-border pb-4 flex-wrap gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Operadores de Bilheteira</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5 font-sans">
+                    Crie e faça a gestão de outros operadores associados à sua transportadora.
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleOpenOperatorModal()}
+                  className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-accent transition-all active:scale-95 flex items-center gap-1.5"
+                >
+                  <Plus size={14} />
+                  <span>Adicionar Operador</span>
+                </button>
+              </div>
+
+              {isLoadingData ? (
+                <div className="text-center py-12 text-muted-foreground font-bold">
+                  Carregando operadores...
+                </div>
+              ) : operators.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  Nenhum operador adicional registado.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 font-semibold text-xs">
+                  {operators.map((op) => (
+                    <div
+                      key={`operator-card-${op.id}`}
+                      className="p-4 bg-muted/20 border border-border rounded-2xl space-y-2.5 flex flex-col justify-between"
+                    >
+                      <div className="space-y-1">
+                        <span className="block font-bold text-foreground text-sm font-sans">
+                          {op.nome}
+                        </span>
+                        <span className="text-[10px] text-primary font-mono block">
+                          {op.email}
+                        </span>
+                        {op.telefone && (
+                          <p className="text-[10px] text-muted-foreground font-sans">
+                            Tlf: {op.telefone}
+                          </p>
+                        )}
+                        {op.document && (
+                          <p className="text-[10px] text-muted-foreground font-sans">
+                            BI/Doc: {op.document}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={() => handleOpenOperatorModal(op)}
+                          className="flex-1 py-1.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl text-[10px] transition-colors flex items-center justify-center gap-1"
+                        >
+                          <Save size={10} />
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteOperator(op.id)}
+                          className="flex-1 py-1.5 border border-danger/25 text-danger hover:bg-danger/5 font-bold rounded-xl text-[10px] transition-colors flex items-center justify-center gap-1"
+                          disabled={op.email === currentUser?.email}
+                          title={op.email === currentUser?.email ? "Não pode remover a sua própria conta" : ""}
                         >
                           <Trash2 size={10} />
                           Remover

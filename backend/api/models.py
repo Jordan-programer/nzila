@@ -108,6 +108,7 @@ class CompanyAdmin(models.Model):
 class Location(models.Model):
     nome = models.CharField(max_length=100)
     provincia = models.CharField(max_length=100)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='locations', null=True, blank=True)
 
     class Meta:
         db_table = 'locations'
@@ -121,6 +122,7 @@ class Route(models.Model):
     destino = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='routes_to')
     distancia_km = models.DecimalField(max_digits=10, decimal_places=2)
     duracao_estimada = models.TimeField()
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='routes', null=True, blank=True)
 
     class Meta:
         db_table = 'routes'

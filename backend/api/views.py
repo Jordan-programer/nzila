@@ -20,6 +20,7 @@ from .models import (
 from .serializers import (
     UserSerializer,
     FiscalSerializer,
+    OperatorSerializer,
     TripSerializer,
     ReservationSerializer,
     LocationSerializer,
@@ -527,13 +528,26 @@ def admin_all_reservations(request):
 @api_view(['GET', 'POST'])
 @permission_classes([AllowAny])
 def manage_locations(request):
+    company_id = request.data.get('company_id') or request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+
     if request.method == 'GET':
-        locations = Location.objects.all().order_by('nome')
+        from django.db.models import Q
+        if company_id:
+            locations = Location.objects.filter(Q(company_id=company_id) | Q(company__isnull=True)).order_by('nome')
+        else:
+            locations = Location.objects.all().order_by('nome')
         serializer = LocationSerializer(locations, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'POST':
-        serializer = LocationSerializer(data=request.data)
+        # If it's a carrier adding a location, make sure it is saved with their company
+        data = request.data.copy()
+        if company_id:
+            data['company'] = company_id
+        
+        serializer = LocationSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -547,6 +561,22 @@ def location_detail(request, pk):
     except Location.DoesNotExist:
         return Response({'error': 'Localização não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
     
+    company_id = request.data.get('company_id') or request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+
+    # Restrict write operations on global locations or locations of other companies
+    if request.method in ['PUT', 'DELETE']:
+        if location.company_id is None:
+            # If the user is an admin, they can edit global locations
+            is_admin = False
+            if request.user.is_authenticated:
+                is_admin = getattr(getattr(request.user, 'profile', None), 'role', None) == 'ADMIN'
+            if not is_admin:
+                return Response({'error': 'Não tem permissão para alterar localizações globais.'}, status=status.HTTP_403_FORBIDDEN)
+        elif str(location.company_id) != str(company_id):
+            return Response({'error': 'Esta localização pertence a outra empresa.'}, status=status.HTTP_403_FORBIDDEN)
+
     if request.method == 'GET':
         serializer = LocationSerializer(location)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -990,8 +1020,16 @@ def carrier_manage_buses(request, pk=None):
 @api_view(['GET', 'POST', 'PUT', 'DELETE'])
 @permission_classes([AllowAny])
 def carrier_manage_routes(request, pk=None):
+    company_id = request.data.get('company_id') or request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+
     if request.method == 'GET':
-        routes = Route.objects.all().order_by('origem__nome')
+        if company_id:
+            from django.db.models import Q
+            routes = Route.objects.filter(Q(company_id=company_id) | Q(company__isnull=True)).order_by('origem__nome')
+        else:
+            routes = Route.objects.all().order_by('origem__nome')
         serializer = RouteSerializer(routes, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1007,7 +1045,11 @@ def carrier_manage_routes(request, pk=None):
         if str(origem_id) == str(destino_id):
             return Response({'error': 'A origem e o destino da rota devem ser diferentes.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if Route.objects.filter(origem_id=origem_id, destino_id=destino_id).exists():
+        from django.db.models import Q
+        duplicate_filter = Q(origem_id=origem_id, destino_id=destino_id)
+        if company_id:
+            duplicate_filter &= (Q(company_id=company_id) | Q(company__isnull=True))
+        if Route.objects.filter(duplicate_filter).exists():
             return Response({'error': 'Esta rota já se encontra registada.'}, status=status.HTTP_400_BAD_REQUEST)
 
         h, m = map(int, duracao.split(':'))
@@ -1015,16 +1057,20 @@ def carrier_manage_routes(request, pk=None):
             origem_id=origem_id,
             destino_id=destino_id,
             distancia_km=float(distancia),
-            duracao_estimada=datetime.time(h, m)
+            duracao_estimada=datetime.time(h, m),
+            company_id=company_id
         )
         serializer = RouteSerializer(route)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     elif request.method == 'PUT':
         try:
-            route = Route.objects.get(pk=pk)
+            if company_id:
+                route = Route.objects.get(pk=pk, company_id=company_id)
+            else:
+                route = Route.objects.get(pk=pk)
         except Route.DoesNotExist:
-            return Response({'error': 'Rota não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Rota não encontrada ou sem permissão.'}, status=status.HTTP_404_NOT_FOUND)
 
         distancia = request.data.get('distancia_km')
         duracao = request.data.get('duracao_estimada')
@@ -1041,9 +1087,12 @@ def carrier_manage_routes(request, pk=None):
 
     elif request.method == 'DELETE':
         try:
-            route = Route.objects.get(pk=pk)
+            if company_id:
+                route = Route.objects.get(pk=pk, company_id=company_id)
+            else:
+                route = Route.objects.get(pk=pk)
         except Route.DoesNotExist:
-            return Response({'error': 'Rota não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': 'Rota não encontrada ou sem permissão.'}, status=status.HTTP_404_NOT_FOUND)
             
         route.delete()
         return Response({'success': 'Rota removida com sucesso.'}, status=status.HTTP_200_OK)
@@ -1500,3 +1549,129 @@ def carrier_manage_fiscais(request, pk=None):
         profile.delete()
         user.delete()
         return Response({'success': 'Fiscal removido com sucesso.'}, status=status.HTTP_200_OK)
+
+@api_view(['GET', 'POST', 'PUT', 'DELETE'])
+@permission_classes([AllowAny])
+def carrier_manage_operators(request, pk=None):
+    """CRUD para operadores da transportadora"""
+    company_id = request.data.get('company_id') or request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+
+    if not company_id:
+        return Response({'error': 'Identificação da transportadora em falta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == 'GET':
+        operators = UserProfile.objects.filter(company_id=company_id, role='OPERADOR').order_by('nome')
+        serializer = OperatorSerializer(operators, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == 'POST':
+        nome = request.data.get('nome', '').strip()
+        email = request.data.get('email', '').strip()
+        telefone = request.data.get('telefone', '')
+        document = request.data.get('document', '')
+        password = request.data.get('password', '')
+
+        if not nome or not email or not password:
+            return Response({'error': 'Nome, email e palavra-passe são obrigatórios.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(username=email).exists():
+            return Response({'error': 'Já existe um utilizador com este email.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            company = Company.objects.get(pk=company_id)
+        except Company.DoesNotExist:
+            return Response({'error': 'Transportadora não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            password=password,
+            first_name=nome.split(' ')[0],
+            last_name=nome.split(' ')[1] if ' ' in nome else ''
+        )
+        profile = UserProfile.objects.create(
+            user=user,
+            nome=nome,
+            email=email,
+            telefone=telefone,
+            document=document,
+            role='OPERADOR',
+            company=company
+        )
+
+        # Create CompanyAdmin record for consistency
+        CompanyAdmin.objects.create(
+            company=company,
+            nome=nome,
+            email=email,
+            telefone=telefone,
+            password=make_password(password),
+            cargo='Operador',
+            documento_identificacao=document
+        )
+
+        # Notify the new operator
+        Notification.objects.create(
+            user=user,
+            tipo='CONFIRMACAO',
+            mensagem=f"Conta de operador criada para a transportadora '{company.nome}'. Use este email para iniciar sessão no portal web.",
+            enviado=True
+        )
+
+        serializer = OperatorSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    if request.method == 'PUT':
+        try:
+            profile = UserProfile.objects.get(pk=pk, company_id=company_id, role='OPERADOR')
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Operador não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        nome = request.data.get('nome', profile.nome).strip()
+        telefone = request.data.get('telefone', profile.telefone or '')
+        document = request.data.get('document', profile.document or '')
+        new_password = request.data.get('password', '')
+
+        profile.nome = nome
+        profile.telefone = telefone
+        profile.document = document
+        profile.save()
+
+        # Update matching CompanyAdmin if exists
+        try:
+            admin_record = CompanyAdmin.objects.get(company_id=company_id, email=profile.email)
+            admin_record.nome = nome
+            admin_record.telefone = telefone
+            admin_record.documento_identificacao = document
+            if new_password:
+                admin_record.password = make_password(new_password)
+            admin_record.save()
+        except CompanyAdmin.DoesNotExist:
+            pass
+
+        # Update the linked Django user
+        profile.user.first_name = nome.split(' ')[0]
+        profile.user.last_name = nome.split(' ')[1] if ' ' in nome else ''
+        if new_password:
+            profile.user.set_password(new_password)
+        profile.user.save()
+
+        serializer = OperatorSerializer(profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    if request.method == 'DELETE':
+        try:
+            profile = UserProfile.objects.get(pk=pk, company_id=company_id, role='OPERADOR')
+        except UserProfile.DoesNotExist:
+            return Response({'error': 'Operador não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user = profile.user
+        
+        # Delete CompanyAdmin as well
+        CompanyAdmin.objects.filter(company_id=company_id, email=profile.email).delete()
+        
+        profile.delete()
+        user.delete()
+        return Response({'success': 'Operador removido com sucesso.'}, status=status.HTTP_200_OK)

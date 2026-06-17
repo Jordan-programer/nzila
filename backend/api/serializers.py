@@ -23,6 +23,20 @@ class FiscalSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = ['id', 'user_id', 'nome', 'email', 'telefone', 'document', 'company_id', 'role']
 
+class OperatorSerializer(serializers.ModelSerializer):
+    """Serializer for UserProfile records with role=OPERADOR"""
+    id = serializers.IntegerField(read_only=True)
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
+    email = serializers.EmailField()
+    nome = serializers.CharField()
+    telefone = serializers.CharField(allow_blank=True, required=False)
+    document = serializers.CharField(allow_blank=True, required=False)
+    company_id = serializers.IntegerField(source='company.id', read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = ['id', 'user_id', 'nome', 'email', 'telefone', 'document', 'company_id', 'role']
+
 class UserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='profile.nome', read_only=True)
     phone = serializers.CharField(source='profile.telefone', read_only=True)
