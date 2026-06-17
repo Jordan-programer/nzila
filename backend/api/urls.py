@@ -50,6 +50,8 @@ urlpatterns = [
     path('carrier/fiscais/', views.carrier_manage_fiscais, name='carrier_manage_fiscais'),
     path('carrier/fiscais/<int:pk>/', views.carrier_manage_fiscais, name='carrier_manage_fiscal_detail'),
     path('notifications/', views.list_notifications, name='list_notifications'),
+    path('notifications/<str:pk>/read/', views.mark_notification_read, name='mark_notification_read'),
+    path('notifications/read-all/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
     
     # Dynamic Popular Routes & Transport Companies API URLs
     path('public/popular-routes/', views.public_popular_routes, name='public_popular_routes'),

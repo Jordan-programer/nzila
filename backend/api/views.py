@@ -1149,6 +1149,45 @@ def list_notifications(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+def mark_notification_read(request, pk):
+    try:
+        # pk can be passed as db-XX in frontend, let's strip db- if present
+        pk_str = str(pk)
+        if pk_str.startswith('db-'):
+            pk_val = int(pk_str.replace('db-', ''))
+        else:
+            pk_val = int(pk_str)
+            
+        notification = Notification.objects.get(pk=pk_val)
+        notification.lida = True
+        notification.save()
+        return Response({'success': 'Notificação marcada como lida.'}, status=status.HTTP_200_OK)
+    except (Notification.DoesNotExist, ValueError):
+        return Response({'error': 'Notificação não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def mark_all_notifications_read(request):
+    user_email = request.data.get('email')
+    
+    if request.user.is_authenticated:
+        Notification.objects.filter(user=request.user, lida=False).update(lida=True)
+        return Response({'success': 'Todas as notificações marcadas como lidas.'}, status=status.HTTP_200_OK)
+    elif user_email:
+        try:
+            user = User.objects.get(email=user_email)
+            Notification.objects.filter(user=user, lida=False).update(lida=True)
+            return Response({'success': 'Todas as notificações marcadas como lidas.'}, status=status.HTTP_200_OK)
+        except User.DoesNotExist:
+            return Response({'error': 'Utilizador não encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+    else:
+        return Response({'error': 'Falta identificação do utilizador.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def resend_carrier_otp(request):
     email = request.data.get('email')
     if not email:

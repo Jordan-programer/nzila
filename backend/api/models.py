@@ -276,6 +276,7 @@ class Notification(models.Model):
     tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
     mensagem = models.TextField()
     enviado = models.BooleanField(default=False)
+    lida = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

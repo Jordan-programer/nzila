@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import { Menu, X, User, LogIn, Bell, ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
 
 const navLinks = [
   { label: 'Início', href: '/', key: 'nav-home' },
@@ -105,6 +106,7 @@ export default function Header() {
                     : 'Nzila: Alerta / Cancelamento',
               snippet: item.mensagem,
               sentAt: item.created_at,
+              lida: item.lida,
             }));
             setNotifications(backendNotifs);
             return;
@@ -139,6 +141,49 @@ export default function Header() {
   const userNotifs = notifications.filter(
     (n) => n.recipient?.toLowerCase() === user?.email?.toLowerCase()
   );
+
+  const unreadNotifsCount = userNotifs.filter((n) => !n.lida).length;
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      const res = await fetch(`/api/notifications/${id}/read/`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, lida: true } : n))
+        );
+      }
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const res = await fetch('/api/notifications/read-all/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user?.email }),
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, lida: true })));
+        toast.success('Todas as notificações foram marcadas como lidas.');
+      }
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
+  const handleNotificationClick = async (n: any, link: string | null) => {
+    if (!n.lida) {
+      await handleMarkAsRead(n.id);
+    }
+    setIsNotifOpen(false);
+    if (link) {
+      router.push(link);
+    }
+  };
 
   return (
     <header
@@ -225,7 +270,7 @@ export default function Header() {
                     title="Notificações"
                   >
                     <Bell size={18} />
-                    {userNotifs.length > 0 && (
+                    {unreadNotifsCount > 0 && (
                       <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full" />
                     )}
                   </button>
@@ -234,12 +279,22 @@ export default function Header() {
                     <div className="absolute right-0 mt-2 w-80 bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3 text-xs animate-bounce-in font-sans">
                       <div className="flex justify-between items-center border-b border-border pb-2">
                         <span className="font-bold text-foreground">Notificações Nzila</span>
-                        <button
-                          onClick={() => setIsNotifOpen(false)}
-                          className="text-muted-foreground hover:text-foreground"
-                        >
-                          <X size={12} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          {unreadNotifsCount > 0 && (
+                            <button
+                              onClick={handleMarkAllAsRead}
+                              className="text-[10px] text-primary font-semibold hover:underline"
+                            >
+                              Marcar todas lidas
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setIsNotifOpen(false)}
+                            className="text-muted-foreground hover:text-foreground p-1"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
                       </div>
                       {userNotifs.length === 0 ? (
                         <div className="text-center py-4 text-muted-foreground">
@@ -250,11 +305,25 @@ export default function Header() {
                           {userNotifs.map((n) => {
                             const link = getNotifLink(n);
                             const isClickable = !!link;
-                            const content = (
-                              <>
-                                <span className="block font-bold text-foreground text-[11px]">
-                                  {n.subject}
-                                </span>
+                            return (
+                              <button
+                                key={n.id}
+                                type="button"
+                                onClick={() => handleNotificationClick(n, link)}
+                                className={`w-full p-2.5 rounded-xl space-y-1 transition-all border text-left cursor-pointer flex flex-col relative ${
+                                  !n.lida
+                                    ? 'bg-primary/5 border-primary/20 hover:bg-primary/10'
+                                    : 'bg-card border-border hover:bg-muted/30'
+                                }`}
+                              >
+                                <div className="flex justify-between items-start w-full">
+                                  <span className="font-bold text-foreground text-[11px] pr-2">
+                                    {n.subject}
+                                  </span>
+                                  {!n.lida && (
+                                    <span className="w-1.5 h-1.5 bg-primary rounded-full mt-1 flex-shrink-0" />
+                                  )}
+                                </div>
                                 <p className="text-muted-foreground text-[10px] leading-relaxed">
                                   {n.snippet}
                                 </p>
@@ -266,33 +335,13 @@ export default function Header() {
                                     <ArrowRight size={9} />
                                   </span>
                                 )}
-                                <span className="block text-[8px] text-muted-foreground/60 text-right">
+                                <span className="block text-[8px] text-muted-foreground/60 text-right w-full mt-1">
                                   {new Date(n.sentAt).toLocaleTimeString('pt-AO', {
                                     hour: '2-digit',
                                     minute: '2-digit',
                                   })}
                                 </span>
-                              </>
-                            );
-                            return isClickable ? (
-                              <button
-                                key={n.id}
-                                type="button"
-                                onClick={() => {
-                                  setIsNotifOpen(false);
-                                  router.push(link);
-                                }}
-                                className="w-full p-2 hover:bg-primary/5 rounded-xl space-y-1 transition-all border border-primary/20 bg-primary/5 text-left cursor-pointer"
-                              >
-                                {content}
                               </button>
-                            ) : (
-                              <div
-                                key={n.id}
-                                className="p-2 hover:bg-muted/40 rounded-xl space-y-1 transition-all border border-border/40 text-left"
-                              >
-                                {content}
-                              </div>
                             );
                           })}
                         </div>
@@ -349,7 +398,7 @@ export default function Header() {
                   title="Notificações"
                 >
                   <Bell size={18} />
-                  {userNotifs.length > 0 && (
+                  {unreadNotifsCount > 0 && (
                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-danger rounded-full" />
                   )}
                 </button>
@@ -358,12 +407,22 @@ export default function Header() {
                   <div className="absolute right-[-40px] mt-2 w-72 bg-card border border-border rounded-2xl shadow-xl z-50 p-4 space-y-3 text-xs animate-bounce-in font-sans">
                     <div className="flex justify-between items-center border-b border-border pb-2">
                       <span className="font-bold text-foreground">Notificações Nzila</span>
-                      <button
-                        onClick={() => setIsNotifOpen(false)}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X size={12} />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {unreadNotifsCount > 0 && (
+                          <button
+                            onClick={handleMarkAllAsRead}
+                            className="text-[9px] text-primary font-semibold hover:underline"
+                          >
+                            Marcar todas lidas
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setIsNotifOpen(false)}
+                          className="text-muted-foreground hover:text-foreground p-1"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
                     </div>
                     {userNotifs.length === 0 ? (
                       <div className="text-center py-4 text-muted-foreground">
@@ -374,11 +433,25 @@ export default function Header() {
                         {userNotifs.map((n) => {
                           const link = getNotifLink(n);
                           const isClickable = !!link;
-                          const content = (
-                            <>
-                              <span className="block font-bold text-foreground text-[10px]">
-                                {n.subject}
-                              </span>
+                          return (
+                            <button
+                              key={n.id}
+                              type="button"
+                              onClick={() => handleNotificationClick(n, link)}
+                              className={`w-full p-2.5 rounded-xl space-y-1 transition-all border text-left cursor-pointer flex flex-col relative ${
+                                !n.lida
+                                  ? 'bg-primary/5 border-primary/20 hover:bg-primary/10'
+                                  : 'bg-card border-border hover:bg-muted/30'
+                              }`}
+                            >
+                              <div className="flex justify-between items-start w-full">
+                                <span className="font-bold text-foreground text-[10px] pr-2">
+                                  {n.subject}
+                                </span>
+                                {!n.lida && (
+                                  <span className="w-1.5 h-1.5 bg-primary rounded-full mt-1 flex-shrink-0" />
+                                )}
+                              </div>
                               <p className="text-muted-foreground text-[9px] leading-relaxed">
                                 {n.snippet}
                               </p>
@@ -390,33 +463,13 @@ export default function Header() {
                                   <ArrowRight size={8} />
                                 </span>
                               )}
-                              <span className="block text-[8px] text-muted-foreground/60 text-right">
+                              <span className="block text-[8px] text-muted-foreground/60 text-right w-full mt-1">
                                 {new Date(n.sentAt).toLocaleTimeString('pt-AO', {
                                   hour: '2-digit',
                                   minute: '2-digit',
                                 })}
                               </span>
-                            </>
-                          );
-                          return isClickable ? (
-                            <button
-                              key={n.id}
-                              type="button"
-                              onClick={() => {
-                                setIsNotifOpen(false);
-                                router.push(link);
-                              }}
-                              className="w-full p-2 hover:bg-primary/5 rounded-xl space-y-1 transition-all border border-primary/20 bg-primary/5 text-left cursor-pointer"
-                            >
-                              {content}
                             </button>
-                          ) : (
-                            <div
-                              key={n.id}
-                              className="p-2 hover:bg-muted/40 rounded-xl space-y-1 transition-all border border-border/40 text-left"
-                            >
-                              {content}
-                            </div>
                           );
                         })}
                       </div>
