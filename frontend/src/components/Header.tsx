@@ -207,15 +207,7 @@ export default function Header() {
                     pathname === '/validation' ? 'text-primary bg-primary/5' : ''
                   }`}
                 >
-                  Fiscal (Web)
-                </Link>
-                <Link
-                  href="/mobile-validation"
-                  className={`px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-150 ${
-                    pathname === '/mobile-validation' ? 'text-primary bg-primary/5' : ''
-                  }`}
-                >
-                  Fiscal (Telemóvel)
+                  Fiscalização
                 </Link>
               </>
             )}
@@ -498,14 +490,7 @@ export default function Header() {
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold uppercase text-muted-foreground hover:text-primary hover:bg-primary/5"
               >
-                Fiscalização (Web)
-              </Link>
-              <Link
-                href="/mobile-validation"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold uppercase text-muted-foreground hover:text-primary hover:bg-primary/5"
-              >
-                Fiscalização (Mobile)
+                Fiscalização
               </Link>
             </div>
           )}
