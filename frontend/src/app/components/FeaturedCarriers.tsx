@@ -23,7 +23,7 @@ export default function FeaturedCarriers() {
           color: c.color || 'bg-blue-600',
           textColor: 'text-white',
           description: c.descricao || 'Empresa parceira oficial da rede de transportes Nzila.',
-          logo: c.logo ? (c.logo.startsWith('http') ? c.logo : `${c.logo}`) : '',
+          logo: c.logo_url || c.logo || '',
         }));
         setCarriers(mapped);
       } catch (err) {

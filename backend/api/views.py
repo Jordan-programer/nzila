@@ -597,6 +597,35 @@ def register_carrier(request):
     if User.objects.filter(username=resp_email).exists():
         return Response({'error': 'Este email de responsável já está registado no sistema.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Process base64 logo
+    import base64
+    import time
+    from django.core.files.base import ContentFile
+    from django.core.files.storage import default_storage
+
+    logo_url = data.get('logo_url')
+    saved_logo_file = None
+    saved_logo_url = None
+
+    if logo_url and logo_url.startswith('data:'):
+        try:
+            parts = logo_url.split(';base64,')
+            if len(parts) == 2:
+                format_part, data_str = parts
+                ext = 'png'
+                if 'jpg' in format_part.lower() or 'jpeg' in format_part.lower():
+                    ext = 'jpg'
+                elif 'gif' in format_part.lower():
+                    ext = 'gif'
+                
+                data_bytes = base64.b64decode(data_str)
+                filename = f"company_logos/logo_{int(time.time())}.{ext}"
+                file_path = default_storage.save(filename, ContentFile(data_bytes))
+                saved_logo_url = f"/media/{file_path}"
+                saved_logo_file = file_path
+        except Exception as e:
+            print(f"Error saving base64 company logo: {e}")
+
     # 1. Create Company (PENDENTE)
     company = Company.objects.create(
         nome=nome,
@@ -609,7 +638,9 @@ def register_carrier(request):
         tipo_empresa=tipo_empresa,
         ano_fundacao=int(ano_fundacao) if ano_fundacao else None,
         status='PENDENTE',
-        code=nome.replace(" ", "").upper()[:8]
+        code=nome.replace(" ", "").upper()[:8],
+        logo_url=saved_logo_url or logo_url or 'https://images.unsplash.com/photo-1557683316-973673baf926?w=150&auto=format&fit=crop&q=60',
+        logo=saved_logo_file
     )
 
     # 2. Create Django Auth User & UserProfile
@@ -734,7 +765,7 @@ def upload_carrier_document(request):
                 data_bytes = base64.b64decode(data_str)
                 filename = f"company_docs/company_{company_id}_{tipo}_{int(time.time())}.{ext}"
                 file_path = default_storage.save(filename, ContentFile(data_bytes))
-                arquivo_url = f"http://localhost:8000/media/{file_path}"
+                arquivo_url = f"/media/{file_path}"
         except Exception as e:
             print(f"Error saving base64 document: {e}")
 
