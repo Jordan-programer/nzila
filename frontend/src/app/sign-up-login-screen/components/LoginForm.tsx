@@ -74,11 +74,15 @@ export default function LoginForm({ onSwitchToRegister }: LoginFormProps) {
 
   const handleSocialLogin = async (provider: 'Google' | 'Facebook') => {
     setIsLoading(true);
+    const tripId = searchParams.get('trip');
+    const callbackUrl = tripId
+      ? `${window.location.origin}/auth/callback?trip=${tripId}`
+      : `${window.location.origin}/auth/callback`;
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider === 'Google' ? 'google' : 'facebook',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
       if (error) throw error;

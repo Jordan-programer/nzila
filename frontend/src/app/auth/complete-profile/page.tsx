@@ -13,7 +13,8 @@ function CompleteProfileForm() {
   const emailParam = searchParams.get('email') || '';
   const nameParam = searchParams.get('name') || '';
   const avatarParam = searchParams.get('avatar') || '';
-  const redirectParam = searchParams.get('redirect') || '/';
+  const tripParam = searchParams.get('trip') || '';
+  const redirectParam = tripParam ? `/payment?trip=${tripParam}` : (searchParams.get('redirect') || '/');
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
