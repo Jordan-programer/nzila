@@ -32,6 +32,8 @@ export default function ResultsContent() {
   const searchParams = useSearchParams();
   const originQuery = searchParams.get('origem') || searchParams.get('origin') || '';
   const destQuery = searchParams.get('destino') || searchParams.get('destination') || '';
+  const dateQuery = searchParams.get('data') || '';
+  const classeQuery = searchParams.get('classe') || '';
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +49,9 @@ export default function ResultsContent() {
         const queryParams = new URLSearchParams();
         if (originQuery) queryParams.append('origin', originQuery);
         if (destQuery) queryParams.append('destination', destQuery);
-        
+        if (dateQuery) queryParams.append('date', dateQuery);
+        if (classeQuery) queryParams.append('class', classeQuery);
+
         if (queryParams.toString()) {
           url += `?${queryParams.toString()}`;
         }
@@ -64,7 +68,7 @@ export default function ResultsContent() {
       }
     };
     fetchTrips();
-  }, [originQuery, destQuery]);
+  }, [originQuery, destQuery, dateQuery, classeQuery]);
 
   const filteredAndSorted = useMemo<Trip[]>(() => {
     let result = trips.filter((trip) => {

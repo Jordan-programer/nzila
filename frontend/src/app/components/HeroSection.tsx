@@ -66,9 +66,17 @@ export default function HeroSection() {
 
   const handleSearch = () => {
     if (!validate()) return;
-    router.push(
-      `/results-page?origem=${encodeURIComponent(origin)}&destino=${encodeURIComponent(destination)}&data=${departureDate}&classe=${travelClass}&tipo=${tripType}`
-    );
+    const params = new URLSearchParams({
+      origem: origin,
+      destino: destination,
+      data: departureDate,
+      classe: travelClass,
+      tipo: tripType,
+    });
+    if (tripType === 'ida-volta' && returnDate) {
+      params.append('volta', returnDate);
+    }
+    router.push(`/results-page?${params.toString()}`);
   };
 
   const selectedClass = CLASSES.find((c) => c.value === travelClass);

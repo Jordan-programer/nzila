@@ -7,9 +7,10 @@ import { ArrowRight, Calendar, Pencil } from 'lucide-react';
 
 export default function SearchSummaryBar() {
   const searchParams = useSearchParams();
-  const origin = searchParams.get('origem') || 'Luanda';
-  const destination = searchParams.get('destino') || 'Huambo';
-  const date = searchParams.get('data') || '2026-06-15';
+  const origin = searchParams.get('origem') || '';
+  const destination = searchParams.get('destino') || '';
+  const date = searchParams.get('data') || '';
+  const returnDate = searchParams.get('volta') || '';
   const travelClass = searchParams.get('classe') || 'economica';
   const tripType = searchParams.get('tipo') || 'ida';
 
@@ -40,6 +41,9 @@ export default function SearchSummaryBar() {
             <div className="flex items-center gap-1.5 text-white/80">
               <Calendar size={14} />
               <span>{formatDate(date)}</span>
+              {tripType === 'ida-volta' && returnDate && (
+                <span>→ {formatDate(returnDate)}</span>
+              )}
             </div>
             <span className="hidden sm:block text-white/40">•</span>
             <span className="text-white/80">{classLabels[travelClass] || travelClass}</span>

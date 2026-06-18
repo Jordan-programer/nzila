@@ -237,7 +237,7 @@ def social_login_user(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_trips(request):
-    trips = Trip.objects.all()
+    trips = Trip.objects.filter(status='ATIVA')
 
     # Apply filters
     origin = request.query_params.get('origin')
@@ -245,10 +245,14 @@ def list_trips(request):
     class_type = request.query_params.get('class')
     carrier = request.query_params.get('carrier')
 
+    date = request.query_params.get('date')
+
     if origin:
         trips = trips.filter(route__origem__nome__icontains=origin)
     if destination:
         trips = trips.filter(route__destino__nome__icontains=destination)
+    if date:
+        trips = trips.filter(data_saida=date)
     if class_type:
         trips = trips.filter(classe=class_type.upper())
     if carrier:
