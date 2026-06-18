@@ -24,6 +24,7 @@ from .serializers import (
     TripSerializer,
     ReservationSerializer,
     LocationSerializer,
+    RouteSerializer,
     CompanySerializer,
     CompanyDocumentSerializer,
     CompanyAdminSerializer,
