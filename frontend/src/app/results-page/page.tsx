@@ -7,7 +7,7 @@ export default function ResultsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      <main className="flex-1 pt-16" style={{ paddingBottom: '4rem' }}>
+      <main className="flex-1 pt-16 lg:pt-20 xl:pt-24" style={{ paddingBottom: '4rem' }}>
         <Suspense
           fallback={
             <div className="flex items-center justify-center min-h-[400px]">
