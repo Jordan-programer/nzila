@@ -439,7 +439,14 @@ function AdminDashboardContent() {
       const res = await fetch('/api/admin/reservations/');
       if (res.ok) {
         const data = await res.json();
-        setReservations(data);
+        const mappedData = data.map((item: any) => ({
+          ...item,
+          passengerName: item.passenger_name || item.passengerName || '',
+          passengerEmail: item.passenger_email || item.passengerEmail || '',
+          passengerPhone: item.passenger_phone || item.passengerPhone || '',
+          passengerDocument: item.passenger_document || item.passengerDocument || '',
+        }));
+        setReservations(mappedData);
       }
     } catch (err) {
       console.error('Error fetching reservations:', err);
@@ -560,14 +567,19 @@ function AdminDashboardContent() {
 
   // Filtered reservations table
   const filteredReservations = reservations.filter((r) => {
+    const name = r.passengerName || '';
+    const code = r.id || '';
+    const orig = r.origin || '';
+    const dest = r.destination || '';
+
     const matchesSearch =
-      r.passengerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.destination.toLowerCase().includes(searchTerm.toLowerCase());
+      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      orig.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dest.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
-      statusFilter === 'todos' || r.status.toLowerCase() === statusFilter.toLowerCase();
+      statusFilter === 'todos' || (r.status || '').toLowerCase() === statusFilter.toLowerCase();
 
     return matchesSearch && matchesStatus;
   });
@@ -1558,6 +1570,16 @@ function AdminDashboardContent() {
                                 )}
                               </td>
                               <td className="p-3 text-right flex items-center justify-end gap-1 flex-wrap">
+                                <button
+                                  onClick={() => {
+                                    setLogoUploadTargetId(c.id);
+                                    setLogoUploadModalOpen(true);
+                                  }}
+                                  title="Upload Logo"
+                                  className="px-2 py-1 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-lg text-[10px] transition-colors"
+                                >
+                                  Logo
+                                </button>
                                 {c.status === 'PENDENTE' && (
                                   <>
                                     <button
@@ -1581,16 +1603,6 @@ function AdminDashboardContent() {
                                 )}
                                 {c.status === 'APROVADA' && (
                                   <>
-                                    <button
-                                      onClick={() => {
-                                        setLogoUploadTargetId(c.id);
-                                        setLogoUploadModalOpen(true);
-                                      }}
-                                      title="Upload Logo"
-                                      className="px-2 py-1 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-lg text-[10px] transition-colors"
-                                    >
-                                      Logo
-                                    </button>
                                     <button
                                       onClick={() => handleReviewCarrier(c.id, 'SUSPENSA')}
                                       title="Suspender Operação"

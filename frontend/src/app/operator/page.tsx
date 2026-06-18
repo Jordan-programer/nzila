@@ -28,6 +28,7 @@ import {
   ShieldCheck,
   Bus as BusIcon,
   Map,
+  Upload,
 } from 'lucide-react';
 
 interface UserSession {
@@ -183,6 +184,7 @@ export default function OperatorDashboardPage() {
   const [profileDesc, setProfileDesc] = useState('');
   const [profileCancel, setProfileCancel] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingLogo, setIsSavingLogo] = useState(false);
 
   // Authenticate & Load session
   useEffect(() => {
@@ -876,6 +878,34 @@ export default function OperatorDashboardPage() {
       toast.error(err.message || 'Erro ao gravar o perfil.');
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  // LOGO UPLOAD
+  const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const companyId = currentUser?.company_id || 1;
+    const formData = new FormData();
+    formData.append('company_id', String(companyId));
+    formData.append('logo', file);
+
+    setIsSavingLogo(true);
+    try {
+      const res = await fetch('/api/admin/carriers/upload-logo/', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Falha no upload do logótipo.');
+      toast.success('Logo da empresa atualizado com sucesso!');
+      fetchCompanyAndOperationalData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Erro ao carregar o logótipo.');
+    } finally {
+      setIsSavingLogo(false);
     }
   };
 
@@ -2532,6 +2562,37 @@ export default function OperatorDashboardPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {/* Left Column stats */}
                   <div className="md:col-span-1 p-5 bg-muted/20 border border-border rounded-2xl space-y-4">
+                    {/* Logo Section */}
+                    <div className="flex flex-col items-center border-b border-border pb-5 mb-4">
+                      <div className="w-24 h-24 rounded-2xl bg-card border border-border flex items-center justify-center font-extrabold text-2xl text-primary overflow-hidden relative shadow-sm mb-3">
+                        {company?.logo_url ? (
+                          <img
+                            src={company.logo_url}
+                            alt="Logo"
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          company?.code || company?.nome?.substring(0, 3).toUpperCase() || 'TRP'
+                        )}
+                        {isSavingLogo && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white">
+                            <Loader2 className="w-6 h-6 animate-spin text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <label className="cursor-pointer px-4 py-2 bg-primary hover:bg-accent text-primary-foreground text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center gap-1.5 shadow-sm">
+                        <Upload size={14} />
+                        <span>{isSavingLogo ? 'A carregar...' : 'Alterar Logótipo'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleUploadLogo}
+                          disabled={isSavingLogo}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
                     <h3 className="text-sm font-bold text-foreground font-sans">
                       Indicadores de Reputação
                     </h3>
