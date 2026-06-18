@@ -127,7 +127,7 @@ export default function ResultsContent() {
     <div className="bg-background min-h-screen">
       <SearchSummaryBar />
 
-      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 lg:py-8">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 lg:py-10">
         <div className="flex gap-6 lg:gap-8">
           {/* Filters Panel */}
           <aside className="hidden lg:block w-64 xl:w-72 flex-shrink-0">

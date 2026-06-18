@@ -190,20 +190,21 @@ export default function Header() {
       className={`fixed top-0 left-0 right-0 z-50 bg-card border-b border-border transition-all duration-300 ${scrolled ? 'shadow-md py-1' : 'shadow-sm py-2'}`}
     >
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
-        <div className="flex items-center justify-between h-16 lg:h-18">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 flex-shrink-0">
-            <AppLogo size={38} />
-            <span className="font-black text-2xl tracking-wider text-foreground">NZILA</span>
+        <div className="relative flex items-center justify-between lg:justify-start h-16 lg:h-20 xl:h-22">
+          {/* Logo — left on desktop, centered on mobile */}
+          <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 lg:mr-8 xl:mr-12
+            absolute left-1/2 -translate-x-1/2 lg:static lg:left-auto lg:translate-x-0">
+            <AppLogo size={38} className="lg:w-11 lg:h-11 xl:w-12 xl:h-12" />
+            <span className="font-black text-2xl lg:text-3xl xl:text-4xl tracking-wider text-foreground">NZILA</span>
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
             {navLinks.map((link) => (
               <Link
                 key={link.key}
                 href={link.href}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-150 ${
+                className={`px-3 xl:px-4 py-2 rounded-lg text-sm xl:text-base font-medium transition-colors duration-150 ${
                   pathname === link.href
                     ? 'text-primary bg-primary/10'
                     : 'text-foreground hover:text-primary hover:bg-primary/5'
@@ -259,7 +260,7 @@ export default function Header() {
           </nav>
 
           {/* Desktop Auth Buttons */}
-          <div className="hidden lg:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2 xl:gap-3">
             {user ? (
               <div className="flex items-center gap-3">
                 {/* Desktop Notification Bell */}
@@ -389,7 +390,7 @@ export default function Header() {
           </div>
 
           {/* Mobile actions & Menu Button */}
-          <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-2 lg:hidden ml-auto">
             {user && (
               <div className="relative">
                 <button
