@@ -77,14 +77,11 @@ function AdminDashboardContent() {
   // On mount: check ?tab= URL param to deep-link directly to a tab
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['indicadores', 'reservas', 'empresas', 'locations', 'rotas_populares'].includes(tabParam)) {
+    if (tabParam && ['indicadores', 'reservas', 'empresas', 'locations', 'rotas_populares', 'viagens'].includes(tabParam)) {
       setAdminTab(tabParam as any);
-      // Refresh carriers when navigating directly to empresas tab
-      if (tabParam === 'empresas') {
-        fetchCarriers();
-      } else if (tabParam === 'rotas_populares') {
-        fetchPopularRoutes();
-      }
+      if (tabParam === 'empresas') fetchCarriers();
+      else if (tabParam === 'rotas_populares') fetchPopularRoutes();
+      else if (tabParam === 'viagens') fetchAdminTrips();
     }
   }, [searchParams]);
 
@@ -135,6 +132,55 @@ function AdminDashboardContent() {
   const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
   const [rejectionTargetId, setRejectionTargetId] = useState<number | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+
+  // Trips management
+  const [adminTrips, setAdminTrips] = useState<any[]>([]);
+  const [isLoadingTrips, setIsLoadingTrips] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<any | null>(null);
+  const [editTripPriceIda, setEditTripPriceIda] = useState('');
+  const [editTripPriceVolta, setEditTripPriceVolta] = useState('');
+
+  const fetchAdminTrips = async () => {
+    setIsLoadingTrips(true);
+    try {
+      const res = await fetch('/api/carrier/trips/');
+      if (!res.ok) throw new Error('HTTP error');
+      const data = await res.json();
+      setAdminTrips(data);
+    } catch (err) {
+      toast.error('Erro ao carregar viagens do servidor.');
+    } finally {
+      setIsLoadingTrips(false);
+    }
+  };
+
+  const handleUpdateTripPrices = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTrip) return;
+    const priceIda = parseFloat(editTripPriceIda);
+    if (isNaN(priceIda) || priceIda <= 0) {
+      toast.error('Preço de ida inválido.');
+      return;
+    }
+    try {
+      const body: any = { preco_ida: priceIda };
+      if (editTripPriceVolta) {
+        const priceVolta = parseFloat(editTripPriceVolta);
+        if (!isNaN(priceVolta) && priceVolta > 0) body.preco_ida_volta = priceVolta;
+      }
+      const res = await fetch(`/api/carrier/trips/${editingTrip.id}/`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Erro no servidor.');
+      toast.success('Preços atualizados com sucesso!');
+      setEditingTrip(null);
+      fetchAdminTrips();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao atualizar preços.');
+    }
+  };
 
   const fetchCarriers = async () => {
     setIsLoadingCarriers(true);
@@ -1001,6 +1047,7 @@ function AdminDashboardContent() {
                 { id: 'indicadores', label: 'Estatísticas', icon: BarChart3 },
                 { id: 'reservas', label: 'Reservas', icon: Ticket },
                 { id: 'empresas', label: 'Empresas & Rotas', icon: Building2 },
+                { id: 'viagens', label: 'Viagens', icon: Calendar },
                 { id: 'locations', label: 'Localidades', icon: MapPin },
                 { id: 'rotas_populares', label: 'Rotas Populares', icon: TrendingUp },
               ].map((tab) => {
@@ -1015,6 +1062,7 @@ function AdminDashboardContent() {
                     onClick={() => {
                       setAdminTab(tab.id as any);
                       if (tab.id === 'empresas') fetchCarriers();
+                      if (tab.id === 'viagens') fetchAdminTrips();
                     }}
                     className={`relative flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                       adminTab === tab.id
@@ -1716,6 +1764,136 @@ function AdminDashboardContent() {
                             </td>
                           </tr>
                         ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Viagens */}
+          {adminTab === 'viagens' && (
+            <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 animate-fade-in">
+              <div className="flex items-center justify-between border-b border-border pb-4 flex-wrap gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Gestão de Viagens</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Consulte e edite os preços de ida e ida e volta de todas as viagens.
+                  </p>
+                </div>
+              </div>
+
+              {/* Modal de edição de preços */}
+              {editingTrip && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+                  <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl">
+                    <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+                      <h3 className="text-base font-bold text-foreground">Editar Preços da Viagem</h3>
+                      <button onClick={() => setEditingTrip(null)} className="p-1 text-muted-foreground hover:bg-muted rounded-lg">
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="mb-4 p-3 bg-muted/40 rounded-xl text-xs font-semibold text-muted-foreground space-y-1">
+                      <div>{editingTrip.origin} → {editingTrip.destination}</div>
+                      <div>{editingTrip.date ? new Date(editingTrip.date + 'T00:00:00').toLocaleDateString('pt-AO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} | {editingTrip.departureTime} → {editingTrip.arrivalTime}</div>
+                      <div>Transportadora: {editingTrip.carrier} · Classe: {editingTrip.classLabel}</div>
+                    </div>
+                    <form onSubmit={handleUpdateTripPrices} className="space-y-4 text-sm font-semibold">
+                      <div>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Preço Só Ida (Kz) *</label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          value={editTripPriceIda}
+                          onChange={(e) => setEditTripPriceIda(e.target.value)}
+                          className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Preço Ida e Volta (Kz)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Opcional"
+                          value={editTripPriceVolta}
+                          onChange={(e) => setEditTripPriceVolta(e.target.value)}
+                          className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <button type="button" onClick={() => setEditingTrip(null)} className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-all">Cancelar</button>
+                        <button type="submit" className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all">Guardar Preços</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {isLoadingTrips ? (
+                <div className="text-center py-12 text-muted-foreground font-bold flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin" /> A carregar viagens...
+                </div>
+              ) : adminTrips.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">Nenhuma viagem registada no sistema.</div>
+              ) : (
+                <div className="overflow-x-auto text-xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border/80 text-muted-foreground font-black uppercase tracking-wider text-[9px] bg-muted/40">
+                        <th className="p-3">Rota</th>
+                        <th className="p-3">Data / Horário</th>
+                        <th className="p-3">Transportadora</th>
+                        <th className="p-3">Classe</th>
+                        <th className="p-3">Preço Ida</th>
+                        <th className="p-3">Preço I/V</th>
+                        <th className="p-3">Estado</th>
+                        <th className="p-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {adminTrips.map((trip) => (
+                        <tr key={`admin-trip-${trip.id}`} className="hover:bg-muted/10 font-medium">
+                          <td className="p-3 font-bold text-foreground">
+                            <div className="flex items-center gap-1">
+                              <span>{trip.origin}</span>
+                              <span className="text-muted-foreground">→</span>
+                              <span>{trip.destination}</span>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <span className="block font-bold text-foreground">
+                              {trip.date ? new Date(trip.date + 'T00:00:00').toLocaleDateString('pt-AO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">{trip.departureTime} → {trip.arrivalTime}</span>
+                          </td>
+                          <td className="p-3 text-foreground">{trip.carrier}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 bg-muted border border-border rounded text-[10px] font-black uppercase">{trip.classLabel}</span>
+                          </td>
+                          <td className="p-3 font-bold text-primary tabular-nums">{Number(trip.price).toLocaleString('pt-AO')} Kz</td>
+                          <td className="p-3 font-semibold text-foreground tabular-nums">
+                            {trip.preco_ida_volta ? `${Number(trip.preco_ida_volta).toLocaleString('pt-AO')} Kz` : <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="p-3">
+                            <span className={`inline-block px-2.5 py-0.5 border rounded-full text-[9px] font-black tracking-wide ${trip.status === 'CANCELADA' ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-success/10 border-success/20 text-success'}`}>
+                              {trip.status || 'ATIVA'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => {
+                                setEditingTrip(trip);
+                                setEditTripPriceIda(String(trip.price));
+                                setEditTripPriceVolta(trip.preco_ida_volta ? String(trip.preco_ida_volta) : '');
+                              }}
+                              className="px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-lg text-[10px] font-black transition-colors"
+                            >
+                              Editar Preços
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>

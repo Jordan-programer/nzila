@@ -98,7 +98,7 @@ interface Trip {
   status?: string;
   bus_id?: number;
   route_id?: number;
-  data_saida?: string; // YYYY-MM-DD
+  date?: string; // YYYY-MM-DD (vem do TripSerializer)
   preco_ida_volta?: number;
 }
 
@@ -1948,7 +1948,13 @@ export default function OperatorDashboardPage() {
                             </td>
                             <td className="p-3">
                               <span className="block font-bold text-foreground">
-                                {trip.data_saida || '2026-06-15'}
+                                {trip.date
+                                  ? new Date(trip.date + 'T00:00:00').toLocaleDateString('pt-AO', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })
+                                  : '—'}
                               </span>
                               <span className="text-[10px] text-muted-foreground block">
                                 Partida: {trip.departureTime} | Chegada: {trip.arrivalTime}

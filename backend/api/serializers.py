@@ -107,6 +107,7 @@ class TripSerializer(serializers.ModelSerializer):
     availableSeats = serializers.SerializerMethodField()
     totalSeats = serializers.IntegerField(source='bus.capacidade', read_only=True)
     price = serializers.IntegerField(source='preco_ida', read_only=True)
+    preco_ida_volta = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True, allow_null=True)
     amenities = serializers.SerializerMethodField()
     occupiedSeats = serializers.SerializerMethodField()
     date = serializers.SerializerMethodField()
@@ -117,7 +118,7 @@ class TripSerializer(serializers.ModelSerializer):
             'id', 'carrier', 'carrierCode', 'carrierColor', 'rating', 'reviews',
             'origin', 'destination', 'date', 'departureTime', 'arrivalTime', 'durationMinutes',
             'durationLabel', 'class_name', 'classLabel', 'availableSeats', 'totalSeats',
-            'price', 'amenities', 'occupiedSeats'
+            'price', 'preco_ida_volta', 'amenities', 'occupiedSeats'
         ]
 
     # Map class_name to keep key "class" compatible in JSON response
