@@ -258,6 +258,7 @@ def list_trips(request):
     if carrier:
         trips = trips.filter(empresa__code=carrier)
 
+    trips = trips.order_by('-data_saida', '-hora_saida')
     serializer = TripSerializer(trips, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
