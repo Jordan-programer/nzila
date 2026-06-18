@@ -258,7 +258,7 @@ def list_trips(request):
     if carrier:
         trips = trips.filter(empresa__code=carrier)
 
-    trips = trips.order_by('-data_saida', '-hora_saida')
+    trips = trips.order_by('data_saida', 'hora_saida')
     serializer = TripSerializer(trips, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1158,10 +1158,12 @@ def carrier_manage_trips(request, pk=None):
         company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
 
     if request.method == 'GET':
+        from django.db.models import Case, When, Value, IntegerField
+        status_order = Case(When(status='ATIVA', then=Value(0)), default=Value(1), output_field=IntegerField())
         if not company_id:
-            trips = Trip.objects.all().order_by('-data_saida', '-hora_saida')
+            trips = Trip.objects.all().annotate(status_order=status_order).order_by('status_order', 'data_saida', 'hora_saida')
         else:
-            trips = Trip.objects.filter(empresa_id=company_id).order_by('-data_saida', '-hora_saida')
+            trips = Trip.objects.filter(empresa_id=company_id).annotate(status_order=status_order).order_by('status_order', 'data_saida', 'hora_saida')
         serializer = TripSerializer(trips, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

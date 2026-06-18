@@ -72,11 +72,24 @@ export default function TripCard({ trip }: TripCardProps) {
           {/* Carrier Badge */}
           <div className="flex-shrink-0">
             <div
-              className={`${trip.carrierColor} w-16 h-12 rounded-xl flex items-center justify-center`}
+              className={`${trip.carrierLogo ? 'bg-card border border-border' : trip.carrierColor} w-16 h-12 rounded-xl flex items-center justify-center overflow-hidden`}
             >
-              <span className="text-white text-xs font-black tracking-tight">
-                {trip.carrierCode}
-              </span>
+              {trip.carrierLogo ? (
+                <img
+                  src={trip.carrierLogo}
+                  alt={trip.carrier}
+                  className="w-full h-full object-contain p-1"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    (e.currentTarget.parentElement as HTMLElement).classList.add(trip.carrierColor);
+                    (e.currentTarget.parentElement as HTMLElement).innerHTML = `<span class="text-white text-xs font-black tracking-tight">${trip.carrierCode}</span>`;
+                  }}
+                />
+              ) : (
+                <span className="text-white text-xs font-black tracking-tight">
+                  {trip.carrierCode}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-0.5 mt-1.5 justify-center">
               <Star size={11} className="text-warning fill-warning" />

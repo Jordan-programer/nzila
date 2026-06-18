@@ -89,6 +89,7 @@ class TripSerializer(serializers.ModelSerializer):
     carrier = serializers.CharField(source='empresa.nome', read_only=True)
     carrierCode = serializers.CharField(source='empresa.code', read_only=True)
     carrierColor = serializers.CharField(source='empresa.color', read_only=True)
+    carrierLogo = serializers.SerializerMethodField()
     rating = serializers.FloatField(source='empresa.rating', read_only=True)
     reviews = serializers.IntegerField(source='empresa.reviews', read_only=True)
     
@@ -117,7 +118,7 @@ class TripSerializer(serializers.ModelSerializer):
     class Meta:
         model = Trip
         fields = [
-            'id', 'carrier', 'carrierCode', 'carrierColor', 'rating', 'reviews',
+            'id', 'carrier', 'carrierCode', 'carrierColor', 'carrierLogo', 'rating', 'reviews',
             'origin', 'origin_provincia', 'destination', 'destination_provincia',
             'date', 'departureTime', 'arrivalTime', 'durationMinutes',
             'durationLabel', 'class_name', 'classLabel', 'availableSeats', 'totalSeats',
@@ -129,6 +130,15 @@ class TripSerializer(serializers.ModelSerializer):
         repr_data = super().to_representation(instance)
         repr_data['class'] = repr_data.pop('class_name')
         return repr_data
+
+    def get_carrierLogo(self, obj):
+        empresa = obj.empresa
+        if empresa.logo_url:
+            return empresa.logo_url
+        if empresa.logo:
+            request = self.context.get('request')
+            return request.build_absolute_uri(empresa.logo.url) if request else empresa.logo.url
+        return None
 
     def get_date(self, obj):
         return obj.data_saida.strftime('%Y-%m-%d')

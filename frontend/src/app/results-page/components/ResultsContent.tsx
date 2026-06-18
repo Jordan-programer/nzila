@@ -36,10 +36,18 @@ export default function ResultsContent() {
   const classeQuery = searchParams.get('classe') || '';
 
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [allCarriers, setAllCarriers] = useState<{ id: number; nome: string; code: string; logo?: string; logo_url?: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sort, setSort] = useState<SortOption>('hora-asc');
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/public/carriers/')
+      .then((r) => r.json())
+      .then((data) => setAllCarriers(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -123,7 +131,7 @@ export default function ResultsContent() {
         <div className="flex gap-6 lg:gap-8">
           {/* Filters Panel */}
           <aside className="hidden lg:block w-64 xl:w-72 flex-shrink-0">
-            <FiltersPanel filters={filters} setFilters={setFilters} trips={trips} />
+            <FiltersPanel filters={filters} setFilters={setFilters} trips={trips} allCarriers={allCarriers} />
           </aside>
 
           {/* Results Column */}
@@ -139,7 +147,7 @@ export default function ResultsContent() {
             {/* Mobile Filters Drawer */}
             {filtersOpen && (
               <div className="lg:hidden mb-4 bg-card border border-border rounded-2xl p-4 animate-slide-up">
-                <FiltersPanel filters={filters} setFilters={setFilters} trips={trips} />
+                <FiltersPanel filters={filters} setFilters={setFilters} trips={trips} allCarriers={allCarriers} />
               </div>
             )}
 

@@ -3,6 +3,7 @@ export interface Trip {
   carrier: string;
   carrierCode: string;
   carrierColor: string;
+  carrierLogo?: string;
   origin: string;
   origin_provincia: string;
   destination: string;

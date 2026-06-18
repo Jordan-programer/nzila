@@ -5,10 +5,19 @@ import { RotateCcw } from 'lucide-react';
 import { FilterState } from './ResultsContent';
 import { Trip } from './mockTrips';
 
+interface CarrierOption {
+  id: number;
+  nome: string;
+  code: string;
+  logo?: string;
+  logo_url?: string;
+}
+
 interface FiltersPanelProps {
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
   trips: Trip[];
+  allCarriers?: CarrierOption[];
 }
 
 const HORARIO_OPTIONS = [
@@ -23,16 +32,18 @@ const CLASS_LABELS: Record<string, string> = {
   vip: 'VIP',
 };
 
-export default function FiltersPanel({ filters, setFilters, trips }: FiltersPanelProps) {
-  // Dynamically extract classes and carriers from loaded trips
+export default function FiltersPanel({ filters, setFilters, trips, allCarriers: allCarriersProp }: FiltersPanelProps) {
+  // Dynamically extract classes from loaded trips
   const allClasses = React.useMemo(() => {
     const classes = [...new Set(trips.map((t) => t.class))].filter(Boolean);
     return classes.length > 0 ? classes : ['economica', 'executiva', 'vip'];
   }, [trips]);
 
+  // Use approved carriers from API; fall back to carriers in current results
   const allCarriers = React.useMemo(() => {
-    return [...new Set(trips.map((t) => t.carrier))].filter(Boolean);
-  }, [trips]);
+    if (allCarriersProp && allCarriersProp.length > 0) return allCarriersProp;
+    return [...new Set(trips.map((t) => t.carrier))].filter(Boolean).map((nome) => ({ id: 0, nome, code: '' }));
+  }, [allCarriersProp, trips]);
 
   const maxPriceLimit = React.useMemo(() => {
     const prices = trips.map((t) => t.price);
@@ -72,6 +83,9 @@ export default function FiltersPanel({ filters, setFilters, trips }: FiltersPane
   trips.forEach((t) => {
     carrierCounts[t.carrier] = (carrierCounts[t.carrier] || 0) + 1;
   });
+
+  // Filter on carrier name (matched against trip.carrier)
+  const toggleCarrier = (nome: string) => toggleArrayFilter('carriers', nome);
 
   return (
     <div className="bg-card border border-border rounded-2xl filter-shadow overflow-hidden">
@@ -201,42 +215,54 @@ export default function FiltersPanel({ filters, setFilters, trips }: FiltersPane
               Transportadora
             </h4>
             <div className="space-y-2">
-              {allCarriers.map((carrier) => (
-                <label
-                  key={`filter-carrier-${carrier}`}
-                  className="flex items-center gap-2.5 cursor-pointer group"
-                >
-                  <div
-                    onClick={() => toggleArrayFilter('carriers', carrier)}
-                    className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 cursor-pointer ${
-                      filters.carriers.includes(carrier)
-                        ? 'bg-primary border-primary'
-                        : 'border-input group-hover:border-primary'
-                    }`}
+              {allCarriers.map((carrier) => {
+                const logoSrc = carrier.logo_url || carrier.logo;
+                const isSelected = filters.carriers.includes(carrier.nome);
+                const count = carrierCounts[carrier.nome] || 0;
+                return (
+                  <label
+                    key={`filter-carrier-${carrier.id}-${carrier.nome}`}
+                    className="flex items-center gap-2.5 cursor-pointer group"
                   >
-                    {filters.carriers.includes(carrier) && (
-                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                        <path
-                          d="M1 4L3.5 6.5L9 1"
-                          stroke="white"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                  <div
-                    onClick={() => toggleArrayFilter('carriers', carrier)}
-                    className="flex items-center justify-between flex-1 cursor-pointer"
-                  >
-                    <span className="text-sm text-foreground">{carrier}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {carrierCounts[carrier] || 0}
-                    </span>
-                  </div>
-                </label>
-              ))}
+                    <div
+                      onClick={() => toggleCarrier(carrier.nome)}
+                      className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 cursor-pointer ${
+                        isSelected
+                          ? 'bg-primary border-primary'
+                          : 'border-input group-hover:border-primary'
+                      }`}
+                    >
+                      {isSelected && (
+                        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                          <path
+                            d="M1 4L3.5 6.5L9 1"
+                            stroke="white"
+                            strokeWidth="1.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                    <div
+                      onClick={() => toggleCarrier(carrier.nome)}
+                      className="flex items-center justify-between flex-1 cursor-pointer gap-2"
+                    >
+                      <div className="flex items-center gap-2">
+                        {logoSrc ? (
+                          <img src={logoSrc} alt={carrier.nome} className="w-6 h-6 object-contain rounded" />
+                        ) : (
+                          <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-[8px] font-black text-primary">
+                            {carrier.code || carrier.nome.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-sm text-foreground">{carrier.nome}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{count}</span>
+                    </div>
+                  </label>
+                );
+              })}
             </div>
           </div>
         )}
