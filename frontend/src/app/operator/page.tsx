@@ -1127,9 +1127,8 @@ export default function OperatorDashboardPage() {
                     Duração Estimada
                   </label>
                   <input
-                    type="text"
+                    type="time"
                     required
-                    placeholder="Ex: 08:30"
                     value={routeDuration}
                     onChange={(e) => setRouteDuration(e.target.value)}
                     className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none"

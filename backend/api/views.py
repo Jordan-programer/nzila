@@ -1,5 +1,5 @@
 import random
-from datetime import datetime
+from datetime import datetime, time as time_obj
 from django.utils import timezone
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
@@ -31,6 +31,47 @@ from .serializers import (
     PopularRouteSerializer,
     BusSerializer,
 )
+
+# ----------------------------------------------------
+# Utility Helpers
+# ----------------------------------------------------
+def parse_duration_to_time(duracao: str):
+    """
+    Parse a duration string into a datetime.time object.
+    Handles multiple formats:
+      - "HH:MM"       -> standard (08:30)
+      - "HH:MM:SS"    -> with seconds (08:30:00)
+      - "8h30"        -> hours and minutes shorthand
+      - "8h"          -> hours only
+      - "120"         -> total minutes as plain number
+    Raises ValueError for unrecognised formats.
+    """
+    import re
+    duracao = str(duracao).strip()
+
+    # Format: HH:MM or HH:MM:SS
+    if ':' in duracao:
+        parts = duracao.split(':')
+        h = int(parts[0])
+        m = int(parts[1])
+        return time_obj(h, m)
+
+    # Format: 8h30, 8h, 8H30, etc.
+    match = re.match(r'^(\d+)[hH](\d*)$', duracao)
+    if match:
+        h = int(match.group(1))
+        m = int(match.group(2)) if match.group(2) else 0
+        return time_obj(h, m)
+
+    # Format: plain minutes number (e.g. "120" = 2 hours)
+    if duracao.isdigit():
+        total_minutes = int(duracao)
+        h = total_minutes // 60
+        m = total_minutes % 60
+        return time_obj(h, m)
+
+    raise ValueError(f"Unrecognised duration format: {duracao!r}")
+
 
 # ----------------------------------------------------
 # Authentication APIs
@@ -1052,12 +1093,16 @@ def carrier_manage_routes(request, pk=None):
         if Route.objects.filter(duplicate_filter).exists():
             return Response({'error': 'Esta rota já se encontra registada.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        h, m = map(int, duracao.split(':'))
+        try:
+            duracao_parsed = parse_duration_to_time(duracao)
+        except ValueError:
+            return Response({'error': 'Formato de duração inválido. Use HH:MM (ex: 08:30).'}, status=status.HTTP_400_BAD_REQUEST)
+
         route = Route.objects.create(
             origem_id=origem_id,
             destino_id=destino_id,
             distancia_km=float(distancia),
-            duracao_estimada=datetime.time(h, m),
+            duracao_estimada=duracao_parsed,
             company_id=company_id
         )
         serializer = RouteSerializer(route)
@@ -1078,8 +1123,10 @@ def carrier_manage_routes(request, pk=None):
         if distancia:
             route.distancia_km = float(distancia)
         if duracao:
-            h, m = map(int, duracao.split(':'))
-            route.duracao_estimada = datetime.time(h, m)
+            try:
+                route.duracao_estimada = parse_duration_to_time(duracao)
+            except ValueError:
+                return Response({'error': 'Formato de duração inválido. Use HH:MM (ex: 08:30).'}, status=status.HTTP_400_BAD_REQUEST)
         
         route.save()
         serializer = RouteSerializer(route)
