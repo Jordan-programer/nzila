@@ -93,7 +93,12 @@ export default function TripCard({ trip }: TripCardProps) {
                 <div className="text-xl lg:text-2xl font-bold text-foreground tabular-nums">
                   {trip.departureTime}
                 </div>
-                <div className="text-xs text-muted-foreground font-medium">{trip.origin}</div>
+                <div className="text-xs font-semibold text-foreground">
+                  {trip.origin_provincia || trip.origin}
+                </div>
+                {trip.origin_provincia && trip.origin !== trip.origin_provincia && (
+                  <div className="text-[10px] text-muted-foreground mt-0.5">{trip.origin}</div>
+                )}
               </div>
 
               {/* Duration bar */}
@@ -115,7 +120,12 @@ export default function TripCard({ trip }: TripCardProps) {
                 <div className="text-xl lg:text-2xl font-bold text-foreground tabular-nums">
                   {trip.arrivalTime}
                 </div>
-                <div className="text-xs text-muted-foreground font-medium">{trip.destination}</div>
+                <div className="text-xs font-semibold text-foreground">
+                  {trip.destination_provincia || trip.destination}
+                </div>
+                {trip.destination_provincia && trip.destination !== trip.destination_provincia && (
+                  <div className="text-[10px] text-muted-foreground mt-0.5">{trip.destination}</div>
+                )}
               </div>
             </div>
 

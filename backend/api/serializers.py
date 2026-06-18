@@ -93,7 +93,9 @@ class TripSerializer(serializers.ModelSerializer):
     reviews = serializers.IntegerField(source='empresa.reviews', read_only=True)
     
     origin = serializers.CharField(source='route.origem.nome', read_only=True)
+    origin_provincia = serializers.CharField(source='route.origem.provincia', read_only=True)
     destination = serializers.CharField(source='route.destino.nome', read_only=True)
+    destination_provincia = serializers.CharField(source='route.destino.provincia', read_only=True)
     
     departureTime = serializers.SerializerMethodField()
     arrivalTime = serializers.SerializerMethodField()
@@ -116,7 +118,8 @@ class TripSerializer(serializers.ModelSerializer):
         model = Trip
         fields = [
             'id', 'carrier', 'carrierCode', 'carrierColor', 'rating', 'reviews',
-            'origin', 'destination', 'date', 'departureTime', 'arrivalTime', 'durationMinutes',
+            'origin', 'origin_provincia', 'destination', 'destination_provincia',
+            'date', 'departureTime', 'arrivalTime', 'durationMinutes',
             'durationLabel', 'class_name', 'classLabel', 'availableSeats', 'totalSeats',
             'price', 'preco_ida_volta', 'amenities', 'occupiedSeats'
         ]

@@ -4,7 +4,9 @@ export interface Trip {
   carrierCode: string;
   carrierColor: string;
   origin: string;
+  origin_provincia: string;
   destination: string;
+  destination_provincia: string;
   date: string;
   departureTime: string;
   arrivalTime: string;

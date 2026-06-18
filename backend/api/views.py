@@ -248,9 +248,9 @@ def list_trips(request):
     date = request.query_params.get('date')
 
     if origin:
-        trips = trips.filter(route__origem__nome__icontains=origin)
+        trips = trips.filter(route__origem__provincia__icontains=origin)
     if destination:
-        trips = trips.filter(route__destino__nome__icontains=destination)
+        trips = trips.filter(route__destino__provincia__icontains=destination)
     if date:
         trips = trips.filter(data_saida=date)
     if class_type:

@@ -1237,8 +1237,8 @@ export default function OperatorDashboardPage() {
       {/* Trip Modal */}
       {isTripModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="w-full max-w-lg bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in font-sans">
-            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+          <div className="w-full max-w-lg bg-card border border-border rounded-3xl shadow-2xl animate-bounce-in font-sans flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center border-b border-border p-6 pb-3 flex-shrink-0">
               <h3 className="text-base font-bold text-foreground">Agendar Nova Viagem (Partida)</h3>
               <button
                 onClick={() => setIsTripModalOpen(false)}
@@ -1247,7 +1247,7 @@ export default function OperatorDashboardPage() {
                 <X size={16} />
               </button>
             </div>
-            <form onSubmit={handleAddTrip} className="space-y-4 text-xs font-bold">
+            <form onSubmit={handleAddTrip} className="space-y-4 text-xs font-bold overflow-y-auto flex-1 p-6 pt-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] text-muted-foreground mb-1.5 font-sans">
