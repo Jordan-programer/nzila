@@ -1,15 +1,38 @@
-- name: Debug: resolver e testar conexão SSH
-  env:
-    HOST: ${{ secrets.DEPLOY_HOST }}
-    USER: ${{ secrets.DEPLOY_USER }}
-  run: |
-    echo "Resolvendo $HOST..."
-    host $HOST || nslookup $HOST || dig +short $HOST || true
-    echo "Verificando porta TCP 22..."
-    if command -v nc >/dev/null 2>&1; then
-      nc -vz $HOST 22 || true
-    else
-      bash -c 'timeout 5 bash -c "cat < /dev/tcp/$HOST/22" >/dev/null 2>&1 && echo PORTA_ABERTA || echo PORTA_FECHADA'
-    fi
-    echo "IP público do runner (para checar allowlist):"
-    curl -fsS https://api.ipify.org || true
+name: Debug SSH Connectivity
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug-ssh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install debugging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dnsutils netcat-openbsd jq || true
+
+      - name: "Debug: resolver e testar conexão SSH"
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          echo "Resolvendo $HOST..."
+          host $HOST || nslookup $HOST || dig +short $HOST || true
+
+          echo "Verificando porta TCP 22..."
+          if command -v nc >/dev/null 2>&1; then
+            nc -vz $HOST 22 || true
+          else
+            timeout 5 bash -c 'cat < /dev/tcp/$HOST/22' >/dev/null 2>&1 && echo "PORTA_ABERTA" || echo "PORTA_FECHADA"
+          fi
+
+          echo "IP público do runner (para checar allowlist):"
+          curl -fsS https://api.ipify.org || true
+
+      - name: Mostrar faixas de IP do GitHub Actions
+        run: |
+          curl -fsS https://api.github.com/meta | jq '.actions' || true
