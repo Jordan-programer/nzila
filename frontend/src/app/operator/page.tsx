@@ -172,6 +172,13 @@ export default function OperatorDashboardPage() {
   const [tripClass, setTripClass] = useState('ECONOMICA');
   const [tripAmenities, setTripAmenities] = useState<string[]>(['ar-condicionado']);
 
+  // Recurrence state
+  const [tripRecurrence, setTripRecurrence] = useState<'none' | 'weekly' | 'monthly'>('none');
+  const [tripRecWeekDays, setTripRecWeekDays] = useState<number[]>([]); // 0=Dom … 6=Sáb
+  const [tripRecMonthDay, setTripRecMonthDay] = useState('');
+  const [tripRecEndDate, setTripRecEndDate] = useState('');
+  const [isSubmittingTrip, setIsSubmittingTrip] = useState(false);
+
   // Profile Edit fields
   const [profileDesc, setProfileDesc] = useState('');
   const [profileCancel, setProfileCancel] = useState('');
@@ -426,57 +433,125 @@ export default function OperatorDashboardPage() {
     }
   };
 
+  // Gera lista de datas conforme recorrência
+  const buildDates = (): string[] => {
+    if (tripRecurrence === 'none') return [tripDate];
+
+    if (!tripRecEndDate) return [];
+    const end = new Date(tripRecEndDate + 'T00:00:00');
+
+    if (tripRecurrence === 'weekly') {
+      if (tripRecWeekDays.length === 0) return [];
+      const dates: string[] = [];
+      const cur = new Date(tripDate + 'T00:00:00');
+      while (cur <= end) {
+        if (tripRecWeekDays.includes(cur.getDay())) {
+          dates.push(cur.toISOString().split('T')[0]);
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates;
+    }
+
+    if (tripRecurrence === 'monthly') {
+      const day = parseInt(tripRecMonthDay);
+      if (!day) return [];
+      const dates: string[] = [];
+      const start = new Date(tripDate + 'T00:00:00');
+      const cur = new Date(start.getFullYear(), start.getMonth(), day);
+      if (cur < start) cur.setMonth(cur.getMonth() + 1);
+      while (cur <= end) {
+        dates.push(cur.toISOString().split('T')[0]);
+        cur.setMonth(cur.getMonth() + 1);
+      }
+      return dates;
+    }
+
+    return [];
+  };
+
   // TRIP CRUD
   const handleAddTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tripRouteId || !tripDate || !tripDepTime || !tripArrTime || !tripPrice || !tripClass) {
-      toast.error('Preencha os campos obrigatórios da viagem.');
-      return;
-    }
 
-    // Business Rule Check: Block if no bus is selected
     if (!tripBusId) {
       toast.error('Não é permitido criar viagens sem associar um autocarro.');
       return;
     }
+    if (!tripRouteId || !tripDepTime || !tripArrTime || !tripPrice || !tripClass) {
+      toast.error('Preencha os campos obrigatórios da viagem.');
+      return;
+    }
+    if (tripRecurrence === 'none' && !tripDate) {
+      toast.error('Selecione a data de partida.');
+      return;
+    }
+    if (tripRecurrence === 'weekly' && (tripRecWeekDays.length === 0 || !tripRecEndDate)) {
+      toast.error('Selecione pelo menos um dia da semana e a data de fim.');
+      return;
+    }
+    if (tripRecurrence === 'monthly' && (!tripRecMonthDay || !tripRecEndDate)) {
+      toast.error('Selecione o dia do mês e a data de fim.');
+      return;
+    }
 
-    const companyId = currentUser?.company_id || 1;
     const selectedBus = buses.find((b) => String(b.id) === String(tripBusId));
     const selectedRoute = routes.find((r) => String(r.id) === String(tripRouteId));
-
     if (!selectedBus || !selectedRoute) {
       toast.error('Autocarro ou Rota selecionados são inválidos.');
       return;
     }
 
-    const payload = {
-      company_id: companyId,
-      route_id: parseInt(tripRouteId),
-      bus_id: parseInt(tripBusId),
-      data_saida: tripDate,
-      hora_saida: tripDepTime,
-      hora_chegada: tripArrTime,
-      preco_ida: parseFloat(tripPrice),
-      preco_ida_volta: tripPriceReturn ? parseFloat(tripPriceReturn) : null,
-      classe: tripClass,
-    };
+    const dates = buildDates();
+    if (dates.length === 0) {
+      toast.error('Nenhuma data gerada. Verifique as opções de recorrência.');
+      return;
+    }
 
-    try {
-      const res = await fetch('/api/carrier/trips/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Falha ao agendar viagem.');
+    const companyId = currentUser?.company_id || 1;
+    setIsSubmittingTrip(true);
+
+    let created = 0;
+    let failed = 0;
+
+    for (const date of dates) {
+      const payload = {
+        company_id: companyId,
+        route_id: parseInt(tripRouteId),
+        bus_id: parseInt(tripBusId),
+        data_saida: date,
+        hora_saida: tripDepTime,
+        hora_chegada: tripArrTime,
+        preco_ida: parseFloat(tripPrice),
+        preco_ida_volta: tripPriceReturn ? parseFloat(tripPriceReturn) : null,
+        classe: tripClass,
+      };
+      try {
+        const res = await fetch('/api/carrier/trips/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) failed++;
+        else created++;
+      } catch {
+        failed++;
       }
-      toast.success('Viagem agendada com sucesso!');
+    }
+
+    setIsSubmittingTrip(false);
+
+    if (created > 0) {
+      toast.success(
+        dates.length === 1
+          ? 'Viagem agendada com sucesso!'
+          : `${created} viagem(ns) agendada(s) com sucesso!${failed > 0 ? ` (${failed} falharam)` : ''}`
+      );
       setIsTripModalOpen(false);
       resetTripForm();
       fetchCompanyAndOperationalData();
-    } catch (err: any) {
-      toast.error(err.message || 'Erro ao agendar viagem.');
+    } else {
+      toast.error('Nenhuma viagem foi criada. Verifique os dados e tente novamente.');
     }
   };
 
@@ -531,6 +606,10 @@ export default function OperatorDashboardPage() {
     setTripPriceReturn('');
     setTripClass('ECONOMICA');
     setTripAmenities(['ar-condicionado']);
+    setTripRecurrence('none');
+    setTripRecWeekDays([]);
+    setTripRecMonthDay('');
+    setTripRecEndDate('');
   };
 
   // FISCAIS CRUD
@@ -1208,10 +1287,35 @@ export default function OperatorDashboardPage() {
                 </div>
               </div>
 
+              {/* Recurrence selector */}
+              <div>
+                <label className="block text-[10px] text-muted-foreground mb-1.5">Tipo de Agendamento</label>
+                <div className="flex gap-2">
+                  {[
+                    { value: 'none', label: 'Data única' },
+                    { value: 'weekly', label: 'Semanal' },
+                    { value: 'monthly', label: 'Mensal' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setTripRecurrence(opt.value as any)}
+                      className={`flex-1 py-1.5 rounded-lg border text-[10px] font-black transition-all ${
+                        tripRecurrence === opt.value
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-card border-border text-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[10px] text-muted-foreground mb-1.5">
-                    Data de Partida *
+                    {tripRecurrence === 'none' ? 'Data de Partida *' : 'Data de Início *'}
                   </label>
                   <input
                     type="date"
@@ -1248,6 +1352,90 @@ export default function OperatorDashboardPage() {
                   />
                 </div>
               </div>
+
+              {/* Weekly options */}
+              {tripRecurrence === 'weekly' && (
+                <div className="bg-muted/30 border border-border rounded-xl p-3 space-y-3">
+                  <div>
+                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">Dias da semana *</label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((label, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() =>
+                            setTripRecWeekDays((prev) =>
+                              prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx]
+                            )
+                          }
+                          className={`w-9 h-9 rounded-lg border text-[10px] font-black transition-all ${
+                            tripRecWeekDays.includes(idx)
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-card border-border text-foreground hover:bg-muted'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">Data de fim *</label>
+                    <input
+                      type="date"
+                      value={tripRecEndDate}
+                      min={tripDate}
+                      onChange={(e) => setTripRecEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-input rounded-xl bg-background text-foreground focus:outline-none text-xs"
+                    />
+                  </div>
+                  {tripDate && tripRecEndDate && tripRecWeekDays.length > 0 && (
+                    <p className="text-[10px] text-primary font-bold">
+                      ≈ {buildDates().length} viagem(ns) serão criadas
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Monthly options */}
+              {tripRecurrence === 'monthly' && (
+                <div className="bg-muted/30 border border-border rounded-xl p-3 space-y-3">
+                  <div>
+                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">Dia do mês *</label>
+                    <div className="flex flex-wrap gap-1">
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setTripRecMonthDay(String(d))}
+                          className={`w-8 h-8 rounded-lg border text-[10px] font-black transition-all ${
+                            tripRecMonthDay === String(d)
+                              ? 'bg-primary text-primary-foreground border-primary'
+                              : 'bg-card border-border text-foreground hover:bg-muted'
+                          }`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">Data de fim *</label>
+                    <input
+                      type="date"
+                      value={tripRecEndDate}
+                      min={tripDate}
+                      onChange={(e) => setTripRecEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-input rounded-xl bg-background text-foreground focus:outline-none text-xs"
+                    />
+                  </div>
+                  {tripDate && tripRecEndDate && tripRecMonthDay && (
+                    <p className="text-[10px] text-primary font-bold">
+                      ≈ {buildDates().length} viagem(ns) serão criadas
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -1325,16 +1513,27 @@ export default function OperatorDashboardPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsTripModalOpen(false)}
+                  onClick={() => { setIsTripModalOpen(false); resetTripForm(); }}
                   className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-all"
+                  disabled={isSubmittingTrip}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all"
+                  disabled={isSubmittingTrip}
+                  className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all disabled:opacity-60 flex items-center justify-center gap-1.5"
                 >
-                  Agendar Viagem
+                  {isSubmittingTrip ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      A criar viagens...
+                    </>
+                  ) : tripRecurrence !== 'none' && buildDates().length > 0 ? (
+                    `Criar ${buildDates().length} Viagem(ns)`
+                  ) : (
+                    'Agendar Viagem'
+                  )}
                 </button>
               </div>
             </form>
