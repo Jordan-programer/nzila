@@ -5,23 +5,42 @@ import { useRouter } from 'next/navigation';
 import { MapPin, Calendar, ChevronDown, Search, ArrowLeftRight, Star } from 'lucide-react';
 
 const PROVINCES = [
-  'Luanda',
-  'Huambo',
-  'Benguela',
-  'Namibe',
-  'Lubango',
-  'Malanje',
-  'Uíge',
-  'Cabinda',
-  'Sumbe',
-  "N'dalatando",
-  'Saurimo',
-  'Dundo',
-  'Menongue',
-  'Kuito',
-  'Mbanza Kongo',
-  'Ondjiva',
+  // Bengo
   'Caxito',
+  // Benguela
+  'Benguela',
+  // Bié
+  'Kuito',
+  // Cabinda
+  'Cabinda',
+  // Cuando Cubango
+  'Menongue',
+  // Cuanza Norte
+  "N'dalatando",
+  // Cuanza Sul
+  'Sumbe',
+  // Cunene
+  'Ondjiva',
+  // Huambo
+  'Huambo',
+  // Huíla
+  'Lubango',
+  // Luanda
+  'Luanda',
+  // Lunda Norte
+  'Dundo',
+  // Lunda Sul
+  'Saurimo',
+  // Malanje
+  'Malanje',
+  // Moxico
+  'Luena',
+  // Namibe
+  'Namibe',
+  // Uíge
+  'Uíge',
+  // Zaire
+  'Mbanza Kongo',
   'Soyo',
 ];
 
