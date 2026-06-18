@@ -1184,9 +1184,9 @@ def carrier_manage_trips(request, pk=None):
         except Bus.DoesNotExist:
             return Response({'error': 'O autocarro selecionado não pertence a esta transportadora.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        data_saida = datetime.datetime.strptime(data_saida_str, '%Y-%m-%d').date()
-        hs = datetime.datetime.strptime(hora_saida_str, '%H:%M').time()
-        hc = datetime.datetime.strptime(hora_chegada_str, '%H:%M').time()
+        data_saida = datetime.strptime(data_saida_str, '%Y-%m-%d').date()
+        hs = datetime.strptime(hora_saida_str, '%H:%M').time()
+        hc = datetime.strptime(hora_chegada_str, '%H:%M').time()
 
         if Trip.objects.filter(bus=bus, data_saida=data_saida, hora_saida=hs, status='ATIVA').exists():
             return Response({'error': 'Este autocarro já se encontra escalado para outra viagem nesta mesma hora.'}, status=status.HTTP_400_BAD_REQUEST)
