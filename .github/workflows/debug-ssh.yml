@@ -17,8 +17,8 @@ jobs:
 
       - name: "Debug: resolver e testar conexão SSH"
         env:
-          HOST: ${{ secrets.DEPLOY_HOST }}
-          USER: ${{ secrets.DEPLOY_USER }}
+          HOST: ${{ secrets.HOST }}
+          USER: ${{ secrets.USER }}
         run: |
           echo "Resolvendo $HOST..."
           host $HOST || nslookup $HOST || dig +short $HOST || true
