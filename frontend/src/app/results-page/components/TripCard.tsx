@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowRight,
+  Calendar,
 } from 'lucide-react';
 import { Trip } from './mockTrips';
 import Icon from '@/components/ui/AppIcon';
@@ -37,6 +38,13 @@ const CLASS_STYLES: Record<string, string> = {
   executiva: 'badge-executiva',
   vip: 'badge-vip',
 };
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  return `${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
+}
 
 export default function TripCard({ trip }: TripCardProps) {
   const router = useRouter();
@@ -110,6 +118,14 @@ export default function TripCard({ trip }: TripCardProps) {
                 <div className="text-xs text-muted-foreground font-medium">{trip.destination}</div>
               </div>
             </div>
+
+            {/* Date row */}
+            {trip.date && (
+              <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
+                <Calendar size={12} className="text-primary" />
+                <span>{formatDate(trip.date)}</span>
+              </div>
+            )}
 
             {/* Class + Amenities row */}
             <div className="flex items-center gap-2 mt-3 flex-wrap">

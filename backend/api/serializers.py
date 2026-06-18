@@ -109,12 +109,13 @@ class TripSerializer(serializers.ModelSerializer):
     price = serializers.IntegerField(source='preco_ida', read_only=True)
     amenities = serializers.SerializerMethodField()
     occupiedSeats = serializers.SerializerMethodField()
+    date = serializers.SerializerMethodField()
 
     class Meta:
         model = Trip
         fields = [
             'id', 'carrier', 'carrierCode', 'carrierColor', 'rating', 'reviews',
-            'origin', 'destination', 'departureTime', 'arrivalTime', 'durationMinutes',
+            'origin', 'destination', 'date', 'departureTime', 'arrivalTime', 'durationMinutes',
             'durationLabel', 'class_name', 'classLabel', 'availableSeats', 'totalSeats',
             'price', 'amenities', 'occupiedSeats'
         ]
@@ -124,6 +125,9 @@ class TripSerializer(serializers.ModelSerializer):
         repr_data = super().to_representation(instance)
         repr_data['class'] = repr_data.pop('class_name')
         return repr_data
+
+    def get_date(self, obj):
+        return obj.data_saida.strftime('%Y-%m-%d')
 
     def get_departureTime(self, obj):
         return obj.hora_saida.strftime('%H:%M')

@@ -5,6 +5,7 @@ export interface Trip {
   carrierColor: string;
   origin: string;
   destination: string;
+  date: string;
   departureTime: string;
   arrivalTime: string;
   durationMinutes: number;
