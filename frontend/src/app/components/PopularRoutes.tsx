@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Clock, TrendingUp } from 'lucide-react';
 
-
 export default function PopularRoutes() {
   const [routes, setRoutes] = useState<any[]>([]);
 
@@ -69,7 +68,9 @@ export default function PopularRoutes() {
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                 ) : (
-                  <div className={`w-full h-full ${route?.gradient || 'bg-gradient-to-br from-blue-500 to-blue-700'}`} />
+                  <div
+                    className={`w-full h-full ${route?.gradient || 'bg-gradient-to-br from-blue-500 to-blue-700'}`}
+                  />
                 )}
                 <div className="absolute inset-0 bg-black/20" />
                 {route?.trending && (

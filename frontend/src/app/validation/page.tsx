@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
-
 interface Reservation {
   id: string;
   codigo_reserva: string;
@@ -388,7 +387,11 @@ export default function TicketValidationPage() {
                           <strong className="underline">{scannedTicket.carrier}</strong>.<br />
                           Como fiscal da{' '}
                           <strong className="underline">
-                            {(() => { const s = localStorage.getItem('nzila_current_user'); const u = s ? JSON.parse(s) : null; return u?.company_code || 'TRANSLUX'; })()}
+                            {(() => {
+                              const s = localStorage.getItem('nzila_current_user');
+                              const u = s ? JSON.parse(s) : null;
+                              return u?.company_code || 'TRANSLUX';
+                            })()}
                           </strong>
                           , apenas tem autorização para confirmar embarques da sua própria
                           transportadora.

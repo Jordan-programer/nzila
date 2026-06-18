@@ -32,7 +32,12 @@ const CLASS_LABELS: Record<string, string> = {
   vip: 'VIP',
 };
 
-export default function FiltersPanel({ filters, setFilters, trips, allCarriers: allCarriersProp }: FiltersPanelProps) {
+export default function FiltersPanel({
+  filters,
+  setFilters,
+  trips,
+  allCarriers: allCarriersProp,
+}: FiltersPanelProps) {
   // Dynamically extract classes from loaded trips
   const allClasses = React.useMemo(() => {
     const classes = [...new Set(trips.map((t) => t.class))].filter(Boolean);
@@ -42,7 +47,9 @@ export default function FiltersPanel({ filters, setFilters, trips, allCarriers: 
   // Use approved carriers from API; fall back to carriers in current results
   const allCarriers = React.useMemo(() => {
     if (allCarriersProp && allCarriersProp.length > 0) return allCarriersProp;
-    return [...new Set(trips.map((t) => t.carrier))].filter(Boolean).map((nome) => ({ id: 0, nome, code: '' }));
+    return [...new Set(trips.map((t) => t.carrier))]
+      .filter(Boolean)
+      .map((nome) => ({ id: 0, nome, code: '' }));
   }, [allCarriersProp, trips]);
 
   const maxPriceLimit = React.useMemo(() => {
@@ -250,7 +257,11 @@ export default function FiltersPanel({ filters, setFilters, trips, allCarriers: 
                     >
                       <div className="flex items-center gap-2">
                         {logoSrc ? (
-                          <img src={logoSrc} alt={carrier.nome} className="w-6 h-6 object-contain rounded" />
+                          <img
+                            src={logoSrc}
+                            alt={carrier.nome}
+                            className="w-6 h-6 object-contain rounded"
+                          />
                         ) : (
                           <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center text-[8px] font-black text-primary">
                             {carrier.code || carrier.nome.slice(0, 2).toUpperCase()}

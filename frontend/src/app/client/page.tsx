@@ -99,8 +99,8 @@ export default function ClientDashboardPage() {
     try {
       const res = await fetch('/api/reservations/', {
         headers: {
-          'Authorization': `Token ${token}`
-        }
+          Authorization: `Token ${token}`,
+        },
       });
       if (res.ok) {
         const data = await res.json();
@@ -122,7 +122,12 @@ export default function ClientDashboardPage() {
         const mapped = data.map((item: any) => ({
           id: `db-${item.id}`,
           recipient: email,
-          subject: item.tipo === 'CONFIRMACAO' ? 'Nzila: Confirmação / Registo' : item.tipo === 'LEMBRETE' ? 'Nzila: Lembrete' : 'Nzila: Alerta / Cancelamento',
+          subject:
+            item.tipo === 'CONFIRMACAO'
+              ? 'Nzila: Confirmação / Registo'
+              : item.tipo === 'LEMBRETE'
+                ? 'Nzila: Lembrete'
+                : 'Nzila: Alerta / Cancelamento',
           snippet: item.mensagem,
           sentAt: item.created_at,
         }));
@@ -205,8 +210,8 @@ export default function ClientDashboardPage() {
         const res = await fetch(`/api/reservations/${cancellationTarget.id}/cancel/`, {
           method: 'POST',
           headers: {
-            'Authorization': `Token ${(user as any).token}`
-          }
+            Authorization: `Token ${(user as any).token}`,
+          },
         });
         if (res.ok) {
           toast.success(`Reserva ${cancellationTarget.id} cancelada com sucesso!`);

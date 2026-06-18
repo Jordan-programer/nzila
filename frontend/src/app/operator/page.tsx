@@ -349,12 +349,9 @@ export default function OperatorDashboardPage() {
     const companyId = currentUser?.company_id || 1;
 
     try {
-      const res = await fetch(
-        `/api/carrier/buses/${busId}/?company_id=${companyId}`,
-        {
-          method: 'DELETE',
-        }
-      );
+      const res = await fetch(`/api/carrier/buses/${busId}/?company_id=${companyId}`, {
+        method: 'DELETE',
+      });
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.error || 'Falha ao eliminar autocarro.');
@@ -669,7 +666,9 @@ export default function OperatorDashboardPage() {
         const err = await res.json();
         throw new Error(err.error || 'Falha ao gravar fiscal.');
       }
-      toast.success(editingFiscal ? 'Fiscal atualizado com sucesso!' : 'Fiscal criado com sucesso!');
+      toast.success(
+        editingFiscal ? 'Fiscal atualizado com sucesso!' : 'Fiscal criado com sucesso!'
+      );
       setIsFiscalModalOpen(false);
       fetchCompanyAndOperationalData();
     } catch (err: any) {
@@ -722,9 +721,7 @@ export default function OperatorDashboardPage() {
     };
 
     try {
-      const url = editingLocation
-        ? `/api/locations/${editingLocation.id}/`
-        : '/api/locations/';
+      const url = editingLocation ? `/api/locations/${editingLocation.id}/` : '/api/locations/';
       const method = editingLocation ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
@@ -736,7 +733,9 @@ export default function OperatorDashboardPage() {
         const err = await res.json();
         throw new Error(err.error || 'Falha ao gravar localidade.');
       }
-      toast.success(editingLocation ? 'Localidade atualizada com sucesso!' : 'Localidade criada com sucesso!');
+      toast.success(
+        editingLocation ? 'Localidade atualizada com sucesso!' : 'Localidade criada com sucesso!'
+      );
       setIsLocationModalOpen(false);
       fetchCompanyAndOperationalData();
     } catch (err: any) {
@@ -745,7 +744,12 @@ export default function OperatorDashboardPage() {
   };
 
   const handleDeleteLocation = async (id: number) => {
-    if (!window.confirm('Tem a certeza que deseja remover esta localidade? Quaisquer rotas associadas serão removidas.')) return;
+    if (
+      !window.confirm(
+        'Tem a certeza que deseja remover esta localidade? Quaisquer rotas associadas serão removidas.'
+      )
+    )
+      return;
     const companyId = currentUser?.company_id || 1;
     try {
       const res = await fetch(`/api/locations/${id}/?company_id=${companyId}`, {
@@ -819,7 +823,9 @@ export default function OperatorDashboardPage() {
         const err = await res.json();
         throw new Error(err.error || 'Falha ao gravar operador.');
       }
-      toast.success(editingOperator ? 'Operador atualizado com sucesso!' : 'Operador criado com sucesso!');
+      toast.success(
+        editingOperator ? 'Operador atualizado com sucesso!' : 'Operador criado com sucesso!'
+      );
       setIsOperatorModalOpen(false);
       fetchCompanyAndOperationalData();
     } catch (err: any) {
@@ -1024,7 +1030,9 @@ export default function OperatorDashboardPage() {
             <form onSubmit={handleAddBus} className="space-y-4 text-sm font-semibold">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Modelo do Veículo *</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                    Modelo do Veículo *
+                  </label>
                   <input
                     type="text"
                     required
@@ -1035,7 +1043,9 @@ export default function OperatorDashboardPage() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Matrícula (Opcional)</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                    Matrícula (Opcional)
+                  </label>
                   <input
                     type="text"
                     placeholder="Ex: LD-12-34-AB"
@@ -1048,32 +1058,52 @@ export default function OperatorDashboardPage() {
 
               {/* Seat Layout Configuration */}
               <div className="bg-muted/40 border border-border rounded-2xl p-4 space-y-3">
-                <p className="text-xs font-black text-foreground uppercase tracking-wider">Layout de Assentos</p>
+                <p className="text-xs font-black text-foreground uppercase tracking-wider">
+                  Layout de Assentos
+                </p>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Colunas Esq.</label>
+                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">
+                      Colunas Esq.
+                    </label>
                     <input
-                      type="number" min="1" max="4"
+                      type="number"
+                      min="1"
+                      max="4"
                       value={busColEsq}
-                      onChange={(e) => setBusColEsq(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
+                      onChange={(e) =>
+                        setBusColEsq(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))
+                      }
                       className="w-full px-3 py-2 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary text-center font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Colunas Dir.</label>
+                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">
+                      Colunas Dir.
+                    </label>
                     <input
-                      type="number" min="1" max="4"
+                      type="number"
+                      min="1"
+                      max="4"
                       value={busColDir}
-                      onChange={(e) => setBusColDir(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))}
+                      onChange={(e) =>
+                        setBusColDir(Math.max(1, Math.min(4, parseInt(e.target.value) || 1)))
+                      }
                       className="w-full px-3 py-2 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary text-center font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">Fileiras</label>
+                    <label className="block text-[10px] font-semibold text-muted-foreground mb-1">
+                      Fileiras
+                    </label>
                     <input
-                      type="number" min="1" max="20"
+                      type="number"
+                      min="1"
+                      max="20"
                       value={busLinhas}
-                      onChange={(e) => setBusLinhas(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                      onChange={(e) =>
+                        setBusLinhas(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))
+                      }
                       className="w-full px-3 py-2 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary text-center font-bold"
                     />
                   </div>
@@ -1082,19 +1112,30 @@ export default function OperatorDashboardPage() {
                 {/* Visual Seat Preview */}
                 <div className="mt-3">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] text-muted-foreground font-semibold">Pré-visualização do Layout</p>
-                    <span className="text-xs font-black text-primary">{busCapacidade} lugares no total</span>
+                    <p className="text-[10px] text-muted-foreground font-semibold">
+                      Pré-visualização do Layout
+                    </p>
+                    <span className="text-xs font-black text-primary">
+                      {busCapacidade} lugares no total
+                    </span>
                   </div>
                   <div className="bg-background border border-border rounded-xl p-3 overflow-x-auto">
                     {/* Bus front */}
-                    <div className="text-center text-[9px] text-muted-foreground font-bold mb-2 tracking-widest">— FRENTE DO AUTOCARRO —</div>
+                    <div className="text-center text-[9px] text-muted-foreground font-bold mb-2 tracking-widest">
+                      — FRENTE DO AUTOCARRO —
+                    </div>
                     <div className="inline-flex flex-col gap-1 min-w-full">
                       {Array.from({ length: Math.min(busLinhas, 6) }).map((_, rowIdx) => (
                         <div key={rowIdx} className="flex items-center gap-1">
-                          <span className="text-[9px] text-muted-foreground w-5 text-right font-bold">{String(rowIdx + 1).padStart(2, '0')}</span>
+                          <span className="text-[9px] text-muted-foreground w-5 text-right font-bold">
+                            {String(rowIdx + 1).padStart(2, '0')}
+                          </span>
                           <div className="flex gap-0.5">
                             {Array.from({ length: busColEsq }).map((_, ci) => (
-                              <div key={ci} className="w-5 h-4 rounded-sm bg-primary/20 border border-primary/40 text-[7px] flex items-center justify-center text-primary font-bold">
+                              <div
+                                key={ci}
+                                className="w-5 h-4 rounded-sm bg-primary/20 border border-primary/40 text-[7px] flex items-center justify-center text-primary font-bold"
+                              >
                                 {String.fromCharCode(65 + ci)}
                               </div>
                             ))}
@@ -1102,7 +1143,10 @@ export default function OperatorDashboardPage() {
                           <div className="w-2 border-l-2 border-dashed border-border h-4" />
                           <div className="flex gap-0.5">
                             {Array.from({ length: busColDir }).map((_, ci) => (
-                              <div key={ci} className="w-5 h-4 rounded-sm bg-blue-500/20 border border-blue-500/40 text-[7px] flex items-center justify-center text-blue-500 font-bold">
+                              <div
+                                key={ci}
+                                className="w-5 h-4 rounded-sm bg-blue-500/20 border border-blue-500/40 text-[7px] flex items-center justify-center text-blue-500 font-bold"
+                              >
                                 {String.fromCharCode(65 + busColEsq + ci)}
                               </div>
                             ))}
@@ -1110,7 +1154,9 @@ export default function OperatorDashboardPage() {
                         </div>
                       ))}
                       {busLinhas > 6 && (
-                        <div className="text-center text-[9px] text-muted-foreground font-bold">... mais {busLinhas - 6} fileiras</div>
+                        <div className="text-center text-[9px] text-muted-foreground font-bold">
+                          ... mais {busLinhas - 6} fileiras
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1247,7 +1293,10 @@ export default function OperatorDashboardPage() {
                 <X size={16} />
               </button>
             </div>
-            <form onSubmit={handleAddTrip} className="space-y-4 text-xs font-bold overflow-y-auto flex-1 p-6 pt-4">
+            <form
+              onSubmit={handleAddTrip}
+              className="space-y-4 text-xs font-bold overflow-y-auto flex-1 p-6 pt-4"
+            >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] text-muted-foreground mb-1.5 font-sans">
@@ -1289,7 +1338,9 @@ export default function OperatorDashboardPage() {
 
               {/* Recurrence selector */}
               <div>
-                <label className="block text-[10px] text-muted-foreground mb-1.5">Tipo de Agendamento</label>
+                <label className="block text-[10px] text-muted-foreground mb-1.5">
+                  Tipo de Agendamento
+                </label>
                 <div className="flex gap-2">
                   {[
                     { value: 'none', label: 'Data única' },
@@ -1357,7 +1408,9 @@ export default function OperatorDashboardPage() {
               {tripRecurrence === 'weekly' && (
                 <div className="bg-muted/30 border border-border rounded-xl p-3 space-y-3">
                   <div>
-                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">Dias da semana *</label>
+                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">
+                      Dias da semana *
+                    </label>
                     <div className="flex gap-1.5 flex-wrap">
                       {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((label, idx) => (
                         <button
@@ -1380,7 +1433,9 @@ export default function OperatorDashboardPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">Data de fim *</label>
+                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">
+                      Data de fim *
+                    </label>
                     <input
                       type="date"
                       value={tripRecEndDate}
@@ -1401,7 +1456,9 @@ export default function OperatorDashboardPage() {
               {tripRecurrence === 'monthly' && (
                 <div className="bg-muted/30 border border-border rounded-xl p-3 space-y-3">
                   <div>
-                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">Dia do mês *</label>
+                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">
+                      Dia do mês *
+                    </label>
                     <div className="flex flex-wrap gap-1">
                       {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
                         <button
@@ -1420,7 +1477,9 @@ export default function OperatorDashboardPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">Data de fim *</label>
+                    <label className="block text-[10px] text-muted-foreground mb-1.5 font-black">
+                      Data de fim *
+                    </label>
                     <input
                       type="date"
                       value={tripRecEndDate}
@@ -1513,7 +1572,10 @@ export default function OperatorDashboardPage() {
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => { setIsTripModalOpen(false); resetTripForm(); }}
+                  onClick={() => {
+                    setIsTripModalOpen(false);
+                    resetTripForm();
+                  }}
                   className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-all"
                   disabled={isSubmittingTrip}
                 >
@@ -1526,8 +1588,7 @@ export default function OperatorDashboardPage() {
                 >
                   {isSubmittingTrip ? (
                     <>
-                      <Loader2 size={14} className="animate-spin" />
-                      A criar viagens...
+                      <Loader2 size={14} className="animate-spin" />A criar viagens...
                     </>
                   ) : tripRecurrence !== 'none' && buildDates().length > 0 ? (
                     `Criar ${buildDates().length} Viagem(ns)`
@@ -1558,7 +1619,9 @@ export default function OperatorDashboardPage() {
             </div>
             <form onSubmit={handleSaveFiscal} className="space-y-4 text-sm font-semibold">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nome Completo *</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Nome Completo *
+                </label>
                 <input
                   type="text"
                   required
@@ -1584,7 +1647,9 @@ export default function OperatorDashboardPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Telefone</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                    Telefone
+                  </label>
                   <input
                     type="tel"
                     placeholder="+244 9XX XXX XXX"
@@ -1594,7 +1659,9 @@ export default function OperatorDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nº Documento</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                    Nº Documento
+                  </label>
                   <input
                     type="text"
                     placeholder="Ex: 005432168LA045"
@@ -1606,7 +1673,9 @@ export default function OperatorDashboardPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
-                  {editingFiscal ? 'Nova Palavra-Passe (deixar em branco para manter)' : 'Palavra-Passe *'}
+                  {editingFiscal
+                    ? 'Nova Palavra-Passe (deixar em branco para manter)'
+                    : 'Palavra-Passe *'}
                 </label>
                 <input
                   type="password"
@@ -1618,7 +1687,8 @@ export default function OperatorDashboardPage() {
                 />
               </div>
               <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-[10px] text-primary font-semibold">
-                💡 O fiscal usará este email e palavra-passe para entrar na aplicação móvel de validação de bilhetes.
+                💡 O fiscal usará este email e palavra-passe para entrar na aplicação móvel de
+                validação de bilhetes.
               </div>
               <div className="flex gap-2 pt-2">
                 <button
@@ -1657,7 +1727,9 @@ export default function OperatorDashboardPage() {
             </div>
             <form onSubmit={handleSaveLocation} className="space-y-4 text-sm font-semibold">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nome da Estação / Terminal *</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Nome da Estação / Terminal *
+                </label>
                 <input
                   type="text"
                   required
@@ -1668,7 +1740,9 @@ export default function OperatorDashboardPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Província *</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Província *
+                </label>
                 <select
                   required
                   value={locationProvincia}
@@ -1677,11 +1751,28 @@ export default function OperatorDashboardPage() {
                 >
                   <option value="">Selecione a Província</option>
                   {[
-                    'Bengo', 'Benguela', 'Bié', 'Cabinda', 'Cuando Cubango', 'Cuanza Norte',
-                    'Cuanza Sul', 'Cunene', 'Huambo', 'Huíla', 'Luanda', 'Lunda Norte',
-                    'Lunda Sul', 'Malanje', 'Moxico', 'Namibe', 'Uíge', 'Zaire'
+                    'Bengo',
+                    'Benguela',
+                    'Bié',
+                    'Cabinda',
+                    'Cuando Cubango',
+                    'Cuanza Norte',
+                    'Cuanza Sul',
+                    'Cunene',
+                    'Huambo',
+                    'Huíla',
+                    'Luanda',
+                    'Lunda Norte',
+                    'Lunda Sul',
+                    'Malanje',
+                    'Moxico',
+                    'Namibe',
+                    'Uíge',
+                    'Zaire',
                   ].map((p) => (
-                    <option key={p} value={p}>{p}</option>
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1722,7 +1813,9 @@ export default function OperatorDashboardPage() {
             </div>
             <form onSubmit={handleSaveOperator} className="space-y-4 text-sm font-semibold">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nome Completo *</label>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Nome Completo *
+                </label>
                 <input
                   type="text"
                   required
@@ -1748,7 +1841,9 @@ export default function OperatorDashboardPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Telefone</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                    Telefone
+                  </label>
                   <input
                     type="tel"
                     placeholder="+244 9XX XXX XXX"
@@ -1758,7 +1853,9 @@ export default function OperatorDashboardPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Nº Documento (BI)</label>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                    Nº Documento (BI)
+                  </label>
                   <input
                     type="text"
                     placeholder="Ex: 002345678LA099"
@@ -1770,7 +1867,9 @@ export default function OperatorDashboardPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
-                  {editingOperator ? 'Nova Palavra-Passe (deixar em branco para manter)' : 'Palavra-Passe *'}
+                  {editingOperator
+                    ? 'Nova Palavra-Passe (deixar em branco para manter)'
+                    : 'Palavra-Passe *'}
                 </label>
                 <input
                   type="password"
@@ -1899,17 +1998,20 @@ export default function OperatorDashboardPage() {
                       >
                         <div className="space-y-1.5 min-w-0">
                           <span className="block font-bold text-foreground text-sm truncate font-sans">
-                            {bus.modelo}{bus.matricula ? ` — ${bus.matricula}` : ''}
+                            {bus.modelo}
+                            {bus.matricula ? ` — ${bus.matricula}` : ''}
                           </span>
                           <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                             <Users size={12} className="text-primary" /> {bus.capacidade} Lugares
                           </span>
                           <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
                             <MapPin size={12} className="text-primary" />
-                            Layout: {bus.colunas_esquerda}+{bus.colunas_direita} × {bus.linhas} fileiras
+                            Layout: {bus.colunas_esquerda}+{bus.colunas_direita} × {bus.linhas}{' '}
+                            fileiras
                           </span>
                           <span className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1">
-                            <Calendar size={12} className="text-primary" /> {busTripsCount} Partidas Agendadas
+                            <Calendar size={12} className="text-primary" /> {busTripsCount} Partidas
+                            Agendadas
                           </span>
                         </div>
                         <button
@@ -1932,7 +2034,9 @@ export default function OperatorDashboardPage() {
             <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 animate-fade-in">
               <div className="flex items-center justify-between border-b border-border pb-4 flex-wrap gap-4">
                 <div>
-                  <h2 className="text-lg font-bold text-foreground">Minhas Localidades / Estações</h2>
+                  <h2 className="text-lg font-bold text-foreground">
+                    Minhas Localidades / Estações
+                  </h2>
                   <p className="text-xs text-muted-foreground mt-0.5 font-sans">
                     Gerencie os seus terminais e pontos de paragem personalizados.
                   </p>
@@ -1980,7 +2084,7 @@ export default function OperatorDashboardPage() {
                             {isGlobal ? 'Global' : 'Personalizada'}
                           </span>
                         </div>
-                        
+
                         {!isGlobal && (
                           <div className="flex items-center gap-1">
                             <button
@@ -2253,7 +2357,8 @@ export default function OperatorDashboardPage() {
                 <div>
                   <h2 className="text-lg font-bold text-foreground">Gestão de Fiscais</h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Adicione e gira os fiscais de pista responsáveis pela validação de bilhetes nos autocarros.
+                    Adicione e gira os fiscais de pista responsáveis pela validação de bilhetes nos
+                    autocarros.
                   </p>
                 </div>
                 <button
@@ -2288,8 +2393,12 @@ export default function OperatorDashboardPage() {
                           {fiscal.nome.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-foreground text-sm truncate">{fiscal.nome}</p>
-                          <p className="text-[10px] text-muted-foreground font-medium truncate">{fiscal.email}</p>
+                          <p className="font-bold text-foreground text-sm truncate">
+                            {fiscal.nome}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground font-medium truncate">
+                            {fiscal.email}
+                          </p>
                         </div>
                         <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded-full text-[9px] font-black tracking-wide flex-shrink-0">
                           FISCAL
@@ -2368,9 +2477,7 @@ export default function OperatorDashboardPage() {
                         <span className="block font-bold text-foreground text-sm font-sans">
                           {op.nome}
                         </span>
-                        <span className="text-[10px] text-primary font-mono block">
-                          {op.email}
-                        </span>
+                        <span className="text-[10px] text-primary font-mono block">{op.email}</span>
                         {op.telefone && (
                           <p className="text-[10px] text-muted-foreground font-sans">
                             Tlf: {op.telefone}
@@ -2394,7 +2501,11 @@ export default function OperatorDashboardPage() {
                           onClick={() => handleDeleteOperator(op.id)}
                           className="flex-1 py-1.5 border border-danger/25 text-danger hover:bg-danger/5 font-bold rounded-xl text-[10px] transition-colors flex items-center justify-center gap-1"
                           disabled={op.email === currentUser?.email}
-                          title={op.email === currentUser?.email ? "Não pode remover a sua própria conta" : ""}
+                          title={
+                            op.email === currentUser?.email
+                              ? 'Não pode remover a sua própria conta'
+                              : ''
+                          }
                         >
                           <Trash2 size={10} />
                           Remover

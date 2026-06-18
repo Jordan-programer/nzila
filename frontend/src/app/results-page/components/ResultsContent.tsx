@@ -36,7 +36,9 @@ export default function ResultsContent() {
   const classeQuery = searchParams.get('classe') || '';
 
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [allCarriers, setAllCarriers] = useState<{ id: number; nome: string; code: string; logo?: string; logo_url?: string }[]>([]);
+  const [allCarriers, setAllCarriers] = useState<
+    { id: number; nome: string; code: string; logo?: string; logo_url?: string }[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sort, setSort] = useState<SortOption>('hora-asc');
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
@@ -63,7 +65,7 @@ export default function ResultsContent() {
         if (queryParams.toString()) {
           url += `?${queryParams.toString()}`;
         }
-        
+
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
@@ -131,7 +133,12 @@ export default function ResultsContent() {
         <div className="flex gap-6 lg:gap-8">
           {/* Filters Panel */}
           <aside className="hidden lg:block w-64 xl:w-72 flex-shrink-0">
-            <FiltersPanel filters={filters} setFilters={setFilters} trips={trips} allCarriers={allCarriers} />
+            <FiltersPanel
+              filters={filters}
+              setFilters={setFilters}
+              trips={trips}
+              allCarriers={allCarriers}
+            />
           </aside>
 
           {/* Results Column */}
@@ -147,7 +154,12 @@ export default function ResultsContent() {
             {/* Mobile Filters Drawer */}
             {filtersOpen && (
               <div className="lg:hidden mb-4 bg-card border border-border rounded-2xl p-4 animate-slide-up">
-                <FiltersPanel filters={filters} setFilters={setFilters} trips={trips} allCarriers={allCarriers} />
+                <FiltersPanel
+                  filters={filters}
+                  setFilters={setFilters}
+                  trips={trips}
+                  allCarriers={allCarriers}
+                />
               </div>
             )}
 

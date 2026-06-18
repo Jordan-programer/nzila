@@ -71,13 +71,25 @@ function AdminDashboardContent() {
 
   // Tabs management
   const [adminTab, setAdminTab] = useState<
-    'indicadores' | 'reservas' | 'empresas' | 'rotas' | 'viagens' | 'relatorios' | 'locations' | 'rotas_populares'
+    | 'indicadores'
+    | 'reservas'
+    | 'empresas'
+    | 'rotas'
+    | 'viagens'
+    | 'relatorios'
+    | 'locations'
+    | 'rotas_populares'
   >('indicadores');
 
   // On mount: check ?tab= URL param to deep-link directly to a tab
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['indicadores', 'reservas', 'empresas', 'locations', 'rotas_populares', 'viagens'].includes(tabParam)) {
+    if (
+      tabParam &&
+      ['indicadores', 'reservas', 'empresas', 'locations', 'rotas_populares', 'viagens'].includes(
+        tabParam
+      )
+    ) {
       setAdminTab(tabParam as any);
       if (tabParam === 'empresas') fetchCarriers();
       else if (tabParam === 'rotas_populares') fetchPopularRoutes();
@@ -112,7 +124,7 @@ function AdminDashboardContent() {
   const [isLoadingPR, setIsLoadingPR] = useState(false);
   const [isPopularRouteModalOpen, setIsPopularRouteModalOpen] = useState(false);
   const [editingPopularRoute, setEditingPopularRoute] = useState<any | null>(null);
-  
+
   const [formPROrigem, setFormPROrigem] = useState('');
   const [formPRDestino, setFormPRDestino] = useState('');
   const [formPRPreco, setFormPRPreco] = useState('');
@@ -356,8 +368,12 @@ function AdminDashboardContent() {
       });
 
       if (!res.ok) throw new Error('API Error');
-      toast.success(editingPopularRoute ? 'Rota popular atualizada com sucesso!' : 'Rota popular cadastrada com sucesso!');
-      
+      toast.success(
+        editingPopularRoute
+          ? 'Rota popular atualizada com sucesso!'
+          : 'Rota popular cadastrada com sucesso!'
+      );
+
       setIsPopularRouteModalOpen(false);
       setEditingPopularRoute(null);
       setFormPROrigem('');
@@ -367,7 +383,7 @@ function AdminDashboardContent() {
       setFormPRFrequencia('Diário');
       setFormPRTrending(true);
       setFormPRImagem(null);
-      
+
       fetchPopularRoutes();
     } catch (err) {
       console.error(err);
@@ -869,7 +885,10 @@ function AdminDashboardContent() {
                   onChange={(e) => setFormPRTrending(e.target.checked)}
                   className="w-4 h-4 text-primary bg-background border-input rounded focus:ring-primary cursor-pointer"
                 />
-                <label htmlFor="trending" className="text-xs font-semibold text-muted-foreground cursor-pointer">
+                <label
+                  htmlFor="trending"
+                  className="text-xs font-semibold text-muted-foreground cursor-pointer"
+                >
                   Destino Popular (Destaque)
                 </label>
               </div>
@@ -919,7 +938,9 @@ function AdminDashboardContent() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in">
             <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
-              <h3 className="text-base font-bold text-foreground">Upload de Logo da Transportadora</h3>
+              <h3 className="text-base font-bold text-foreground">
+                Upload de Logo da Transportadora
+              </h3>
               <button
                 onClick={() => {
                   setLogoUploadModalOpen(false);
@@ -1440,7 +1461,7 @@ function AdminDashboardContent() {
                                       <img
                                         src={
                                           (c.logo_url || c.logo).startsWith('http')
-                                            ? (c.logo_url || c.logo)
+                                            ? c.logo_url || c.logo
                                             : `${c.logo_url || c.logo}`
                                         }
                                         alt="Logo"
@@ -1788,19 +1809,42 @@ function AdminDashboardContent() {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
                   <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl">
                     <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
-                      <h3 className="text-base font-bold text-foreground">Editar Preços da Viagem</h3>
-                      <button onClick={() => setEditingTrip(null)} className="p-1 text-muted-foreground hover:bg-muted rounded-lg">
+                      <h3 className="text-base font-bold text-foreground">
+                        Editar Preços da Viagem
+                      </h3>
+                      <button
+                        onClick={() => setEditingTrip(null)}
+                        className="p-1 text-muted-foreground hover:bg-muted rounded-lg"
+                      >
                         <X size={16} />
                       </button>
                     </div>
                     <div className="mb-4 p-3 bg-muted/40 rounded-xl text-xs font-semibold text-muted-foreground space-y-1">
-                      <div>{editingTrip.origin} → {editingTrip.destination}</div>
-                      <div>{editingTrip.date ? new Date(editingTrip.date + 'T00:00:00').toLocaleDateString('pt-AO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'} | {editingTrip.departureTime} → {editingTrip.arrivalTime}</div>
-                      <div>Transportadora: {editingTrip.carrier} · Classe: {editingTrip.classLabel}</div>
-                    </div>
-                    <form onSubmit={handleUpdateTripPrices} className="space-y-4 text-sm font-semibold">
                       <div>
-                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Preço Só Ida (Kz) *</label>
+                        {editingTrip.origin} → {editingTrip.destination}
+                      </div>
+                      <div>
+                        {editingTrip.date
+                          ? new Date(editingTrip.date + 'T00:00:00').toLocaleDateString('pt-AO', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '—'}{' '}
+                        | {editingTrip.departureTime} → {editingTrip.arrivalTime}
+                      </div>
+                      <div>
+                        Transportadora: {editingTrip.carrier} · Classe: {editingTrip.classLabel}
+                      </div>
+                    </div>
+                    <form
+                      onSubmit={handleUpdateTripPrices}
+                      className="space-y-4 text-sm font-semibold"
+                    >
+                      <div>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                          Preço Só Ida (Kz) *
+                        </label>
                         <input
                           type="number"
                           required
@@ -1811,7 +1855,9 @@ function AdminDashboardContent() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Preço Ida e Volta (Kz)</label>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                          Preço Ida e Volta (Kz)
+                        </label>
                         <input
                           type="number"
                           min="1"
@@ -1822,8 +1868,19 @@ function AdminDashboardContent() {
                         />
                       </div>
                       <div className="flex gap-2 pt-2">
-                        <button type="button" onClick={() => setEditingTrip(null)} className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-all">Cancelar</button>
-                        <button type="submit" className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all">Guardar Preços</button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingTrip(null)}
+                          className="flex-1 py-2.5 border border-border text-foreground hover:bg-muted font-bold rounded-xl transition-all"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="flex-1 py-2.5 bg-primary text-primary-foreground hover:bg-accent font-bold rounded-xl transition-all"
+                        >
+                          Guardar Preços
+                        </button>
                       </div>
                     </form>
                   </div>
@@ -1835,7 +1892,9 @@ function AdminDashboardContent() {
                   <Loader2 size={16} className="animate-spin" /> A carregar viagens...
                 </div>
               ) : adminTrips.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground">Nenhuma viagem registada no sistema.</div>
+                <div className="text-center py-16 text-muted-foreground">
+                  Nenhuma viagem registada no sistema.
+                </div>
               ) : (
                 <div className="overflow-x-auto text-xs">
                   <table className="w-full text-left border-collapse">
@@ -1863,20 +1922,38 @@ function AdminDashboardContent() {
                           </td>
                           <td className="p-3">
                             <span className="block font-bold text-foreground">
-                              {trip.date ? new Date(trip.date + 'T00:00:00').toLocaleDateString('pt-AO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                              {trip.date
+                                ? new Date(trip.date + 'T00:00:00').toLocaleDateString('pt-AO', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })
+                                : '—'}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">{trip.departureTime} → {trip.arrivalTime}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {trip.departureTime} → {trip.arrivalTime}
+                            </span>
                           </td>
                           <td className="p-3 text-foreground">{trip.carrier}</td>
                           <td className="p-3">
-                            <span className="px-2 py-0.5 bg-muted border border-border rounded text-[10px] font-black uppercase">{trip.classLabel}</span>
+                            <span className="px-2 py-0.5 bg-muted border border-border rounded text-[10px] font-black uppercase">
+                              {trip.classLabel}
+                            </span>
                           </td>
-                          <td className="p-3 font-bold text-primary tabular-nums">{Number(trip.price).toLocaleString('pt-AO')} Kz</td>
+                          <td className="p-3 font-bold text-primary tabular-nums">
+                            {Number(trip.price).toLocaleString('pt-AO')} Kz
+                          </td>
                           <td className="p-3 font-semibold text-foreground tabular-nums">
-                            {trip.preco_ida_volta ? `${Number(trip.preco_ida_volta).toLocaleString('pt-AO')} Kz` : <span className="text-muted-foreground">—</span>}
+                            {trip.preco_ida_volta ? (
+                              `${Number(trip.preco_ida_volta).toLocaleString('pt-AO')} Kz`
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="p-3">
-                            <span className={`inline-block px-2.5 py-0.5 border rounded-full text-[9px] font-black tracking-wide ${trip.status === 'CANCELADA' ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-success/10 border-success/20 text-success'}`}>
+                            <span
+                              className={`inline-block px-2.5 py-0.5 border rounded-full text-[9px] font-black tracking-wide ${trip.status === 'CANCELADA' ? 'bg-danger/10 border-danger/20 text-danger' : 'bg-success/10 border-success/20 text-success'}`}
+                            >
                               {trip.status || 'ATIVA'}
                             </span>
                           </td>
@@ -1885,7 +1962,9 @@ function AdminDashboardContent() {
                               onClick={() => {
                                 setEditingTrip(trip);
                                 setEditTripPriceIda(String(trip.price));
-                                setEditTripPriceVolta(trip.preco_ida_volta ? String(trip.preco_ida_volta) : '');
+                                setEditTripPriceVolta(
+                                  trip.preco_ida_volta ? String(trip.preco_ida_volta) : ''
+                                );
                               }}
                               className="px-3 py-1.5 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-lg text-[10px] font-black transition-colors"
                             >
@@ -1961,17 +2040,25 @@ function AdminDashboardContent() {
                               <div className="w-14 h-10 rounded-lg bg-muted overflow-hidden flex items-center justify-center border border-border flex-shrink-0">
                                 {route.imagem ? (
                                   <img
-                                    src={route.imagem.startsWith('http') ? route.imagem : `${route.imagem}`}
+                                    src={
+                                      route.imagem.startsWith('http')
+                                        ? route.imagem
+                                        : `${route.imagem}`
+                                    }
                                     alt={`${route.origin} para ${route.destination}`}
                                     className="w-full h-full object-cover"
                                   />
                                 ) : (
-                                  <span className="text-[9px] text-muted-foreground italic">Sem Foto</span>
+                                  <span className="text-[9px] text-muted-foreground italic">
+                                    Sem Foto
+                                  </span>
                                 )}
                               </div>
                               <div>
                                 <span className="font-bold text-foreground text-sm font-sans flex items-center gap-1.5">
-                                  {route.origin} <ArrowRight size={12} className="text-muted-foreground" /> {route.destination}
+                                  {route.origin}{' '}
+                                  <ArrowRight size={12} className="text-muted-foreground" />{' '}
+                                  {route.destination}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground block font-mono">
                                   {route.origin_provincia} para {route.destination_provincia}

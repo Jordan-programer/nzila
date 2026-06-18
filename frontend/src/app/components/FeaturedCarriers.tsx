@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { Star, MapPin } from 'lucide-react';
 
-
 export default function FeaturedCarriers() {
   const [carriers, setCarriers] = useState<any[]>([]);
 
@@ -63,7 +62,9 @@ export default function FeaturedCarriers() {
                     className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                   />
                 ) : (
-                  <div className={`absolute inset-0 ${carrier?.color || 'bg-blue-600'} flex items-center justify-center`}>
+                  <div
+                    className={`absolute inset-0 ${carrier?.color || 'bg-blue-600'} flex items-center justify-center`}
+                  >
                     <span className="text-2xl font-black text-white tracking-wide">
                       {carrier?.shortName}
                     </span>

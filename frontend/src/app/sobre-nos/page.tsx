@@ -3,7 +3,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { Shield, Sparkles, Compass, Users, Globe, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
+import {
+  Shield,
+  Sparkles,
+  Compass,
+  Users,
+  Globe,
+  Mail,
+  ArrowRight,
+  CheckCircle2,
+} from 'lucide-react';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -26,7 +35,8 @@ const teamMembers = [
     role: 'Director de Tecnologia (CTO) & Co-Fundador',
     image: '/assets/people/JordanPedro.jpeg',
     bio: 'Engenheiro de Software e inteligência de dados. Lidera o desenvolvimento e inovação tecnológica na plataforma.',
-    linkedin: 'https://www.linkedin.com/in/jordan-pedro-a9b009351?utm_source=share_via&utm_content=profile&utm_medium=member_android',
+    linkedin:
+      'https://www.linkedin.com/in/jordan-pedro-a9b009351?utm_source=share_via&utm_content=profile&utm_medium=member_android',
     email: 'jordanpedro2005@gmail.com',
   },
   {
@@ -50,19 +60,22 @@ const teamMembers = [
 const values = [
   {
     title: 'Segurança & Confiança',
-    description: 'Trabalhamos exclusivamente com transportadoras licenciadas e seguras. As suas viagens e transações financeiras são totalmente protegidas.',
+    description:
+      'Trabalhamos exclusivamente com transportadoras licenciadas e seguras. As suas viagens e transações financeiras são totalmente protegidas.',
     icon: Shield,
     color: 'text-emerald-600 bg-emerald-50',
   },
   {
     title: 'Inovação Contínua',
-    description: 'Desenvolvemos soluções tecnológicas de ponta — bilhetes digitais com QR Code e confirmação automática — para simplificar a sua vida.',
+    description:
+      'Desenvolvemos soluções tecnológicas de ponta — bilhetes digitais com QR Code e confirmação automática — para simplificar a sua vida.',
     icon: Sparkles,
     color: 'text-blue-600 bg-blue-50',
   },
   {
     title: 'Conectividade Nacional',
-    description: 'Encurtamos as distâncias entre as 18 províncias de Angola, facilitando a circulação de pessoas e bens de forma integrada e transparente.',
+    description:
+      'Encurtamos as distâncias entre as 18 províncias de Angola, facilitando a circulação de pessoas e bens de forma integrada e transparente.',
     icon: Compass,
     color: 'text-purple-600 bg-purple-50',
   },
@@ -91,7 +104,9 @@ export default function SobreNosPage() {
               <span className="text-primary">de forma rápida e moderna</span>
             </h1>
             <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-3xl mx-auto">
-              O Nzila nasceu de uma necessidade real: tornar a reserva de viagens terrestres interprovinciais simples, fiável e acessível a qualquer pessoa, a partir de qualquer lugar.
+              O Nzila nasceu de uma necessidade real: tornar a reserva de viagens terrestres
+              interprovinciais simples, fiável e acessível a qualquer pessoa, a partir de qualquer
+              lugar.
             </p>
           </div>
         </section>
@@ -104,15 +119,18 @@ export default function SobreNosPage() {
                 A nossa missão é encurtar distâncias e unir famílias
               </h2>
               <p className="text-muted-foreground leading-relaxed">
-                Diariamente, milhares de angolanos viajam por via rodoviária entre as nossas belas províncias. A nossa missão é fornecer uma plataforma tecnológica estável que conecta os passageiros às maiores frotas do país de forma transparente, eliminando filas nas agências e incertezas nas viagens.
+                Diariamente, milhares de angolanos viajam por via rodoviária entre as nossas belas
+                províncias. A nossa missão é fornecer uma plataforma tecnológica estável que conecta
+                os passageiros às maiores frotas do país de forma transparente, eliminando filas nas
+                agências e incertezas nas viagens.
               </p>
-              
+
               <div className="space-y-3">
                 {[
                   'Compra rápida de passagens sem sair de casa.',
                   'Acesso a várias operadoras rodoviárias numa única plataforma.',
                   'Pagamentos seguros via Referência Multicaixa e Express.',
-                  'Emissão imediata de bilhetes digitais com validação via QR Code.'
+                  'Emissão imediata de bilhetes digitais com validação via QR Code.',
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center gap-3">
                     <CheckCircle2 className="text-primary flex-shrink-0" size={20} />
@@ -128,7 +146,9 @@ export default function SobreNosPage() {
               <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent group-hover:scale-110 transition-transform duration-700" />
               <div className="relative z-20 text-center p-8">
                 <p className="text-5xl font-black text-white mb-2">20</p>
-                <p className="text-sm font-bold tracking-widest text-emerald-200 uppercase mb-6">Províncias Conectadas</p>
+                <p className="text-sm font-bold tracking-widest text-emerald-200 uppercase mb-6">
+                  Províncias Conectadas
+                </p>
                 <p className="text-white/80 max-w-md mx-auto italic">
                   "Facilitando o comércio, o turismo e o reencontro familiar de Cabinda ao Cunene."
                 </p>
@@ -142,15 +162,22 @@ export default function SobreNosPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto mb-12">
               <h2 className="text-3xl font-extrabold text-foreground">Os Nossos Valores</h2>
-              <p className="text-muted-foreground mt-2">Os pilares que sustentam a nossa plataforma e a nossa relação com os passageiros.</p>
+              <p className="text-muted-foreground mt-2">
+                Os pilares que sustentam a nossa plataforma e a nossa relação com os passageiros.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {values.map((v, idx) => {
                 const IconComponent = v.icon;
                 return (
-                  <div key={idx} className="bg-background border border-border/80 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${v.color} mb-5`}>
+                  <div
+                    key={idx}
+                    className="bg-background border border-border/80 rounded-2xl p-6 transition-all duration-300 hover:shadow-lg"
+                  >
+                    <div
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center ${v.color} mb-5`}
+                    >
                       <IconComponent size={24} />
                     </div>
                     <h3 className="text-lg font-bold text-foreground mb-2">{v.title}</h3>
@@ -169,14 +196,15 @@ export default function SobreNosPage() {
               Corpo Administrativo
             </h2>
             <p className="text-muted-foreground mt-3 text-base">
-              Conheça os líderes e fundadores dedicados a reinventar a mobilidade terrestre interprovincial em Angola.
+              Conheça os líderes e fundadores dedicados a reinventar a mobilidade terrestre
+              interprovincial em Angola.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {teamMembers.map((member, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="bg-card border border-border/80 rounded-2xl overflow-hidden shadow-card transition-all duration-300 hover:shadow-card-hover group"
               >
                 {/* Image Wrapper */}
@@ -216,9 +244,7 @@ export default function SobreNosPage() {
                   <p className="text-xs font-semibold text-primary uppercase tracking-wider mb-4">
                     {member.role}
                   </p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {member.bio}
-                  </p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{member.bio}</p>
                 </div>
               </div>
             ))}
@@ -232,9 +258,12 @@ export default function SobreNosPage() {
             <div className="absolute -top-16 -left-16 w-64 h-64 rounded-full bg-white/10 blur-2xl" />
 
             <div className="relative z-10 max-w-2xl mx-auto">
-              <h2 className="text-2xl sm:text-3xl font-extrabold mb-4">Quer saber mais sobre as nossas parcerias?</h2>
+              <h2 className="text-2xl sm:text-3xl font-extrabold mb-4">
+                Quer saber mais sobre as nossas parcerias?
+              </h2>
               <p className="text-white/85 text-sm sm:text-base mb-8">
-                Se é uma operadora rodoviária e gostaria de integrar as suas rotas no Nzila, fale diretamente com a nossa equipa operacional.
+                Se é uma operadora rodoviária e gostaria de integrar as suas rotas no Nzila, fale
+                diretamente com a nossa equipa operacional.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link

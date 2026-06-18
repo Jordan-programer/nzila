@@ -121,7 +121,7 @@ function CheckoutContent() {
         if (!res.ok) throw new Error('Viagem não encontrada no servidor.');
         const data = await res.json();
         setTrip(data);
-        
+
         // Load occupied seats dynamically from API
         setOccupiedSeats(data.occupiedSeats || []);
 
@@ -217,7 +217,7 @@ function CheckoutContent() {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Token ${token}`,
+                Authorization: `Token ${token}`,
               },
               body: JSON.stringify({
                 tripId: trip.id,

@@ -41,9 +41,7 @@ export default function SearchSummaryBar() {
             <div className="flex items-center gap-1.5 text-white/80">
               <Calendar size={14} />
               <span>{formatDate(date)}</span>
-              {tripType === 'ida-volta' && returnDate && (
-                <span>→ {formatDate(returnDate)}</span>
-              )}
+              {tripType === 'ida-volta' && returnDate && <span>→ {formatDate(returnDate)}</span>}
             </div>
             <span className="hidden sm:block text-white/40">•</span>
             <span className="text-white/80">{classLabels[travelClass] || travelClass}</span>

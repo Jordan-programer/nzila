@@ -642,7 +642,9 @@ export default function RegisterForm({ onSwitchToLogin, onRegisterTypeChange }: 
           }
         } catch (docErr: any) {
           console.error(`Error uploading document ${d.tipo}:`, docErr);
-          toast.error(`Falha ao enviar documento "${d.tipo.replace('_', ' ')}": ${docErr.message || docErr}`);
+          toast.error(
+            `Falha ao enviar documento "${d.tipo.replace('_', ' ')}": ${docErr.message || docErr}`
+          );
         }
       }
 

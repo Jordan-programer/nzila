@@ -16,6 +16,18 @@ const AppLogo = memo(function AppLogo({
   className = '',
   onClick,
 }: AppLogoProps) {
+  // Memoize size styles when size is a number and width/height classes are NOT provided
+  const sizeStyle = useMemo(() => {
+    const hasWidth = className.split(' ').some((c) => c.startsWith('w-') || c.startsWith('max-w-'));
+    const hasHeight = className
+      .split(' ')
+      .some((c) => c.startsWith('h-') || c.startsWith('max-h-'));
+    return {
+      width: hasWidth ? undefined : size,
+      height: hasHeight ? undefined : size,
+    };
+  }, [className, size]);
+
   // Memoize className calculation
   const containerClassName = useMemo(() => {
     const classes = ['flex items-center justify-center flex-shrink-0'];
@@ -25,14 +37,14 @@ const AppLogo = memo(function AppLogo({
   }, [onClick, className]);
 
   return (
-    <div className={containerClassName} onClick={onClick}>
+    <div className={containerClassName} style={sizeStyle} onClick={onClick}>
       {src ? (
         <AppImage
           src={src}
           alt="Logo"
           width={size}
           height={size}
-          className="flex-shrink-0 object-contain"
+          className="flex-shrink-0 object-contain w-full h-full"
           priority={true}
           unoptimized={src.endsWith('.svg')}
         />
@@ -43,7 +55,7 @@ const AppLogo = memo(function AppLogo({
           viewBox="0 0 100 100"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="flex-shrink-0"
+          className="flex-shrink-0 w-full h-full"
         >
           <defs>
             {/* Green Ribbon Gradient (Front Stem) */}

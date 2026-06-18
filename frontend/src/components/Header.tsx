@@ -35,7 +35,7 @@ export default function Header() {
   const getNotifLink = (n: any): string | null => {
     if (!user) return null;
     const role = user.role?.toLowerCase();
-    
+
     // Admin checks
     if (role === 'admin') {
       const text = ((n.subject || '') + ' ' + (n.snippet || '')).toLowerCase();
@@ -49,17 +49,17 @@ export default function Header() {
       }
       return '/admin';
     }
-    
+
     // Operator checks
     if (role === 'operador' || role === 'operator') {
       return '/operator';
     }
-    
+
     // Fiscal checks
     if (role === 'fiscal') {
       return '/validation';
     }
-    
+
     // Client checks (default)
     return '/client';
   };
@@ -90,9 +90,7 @@ export default function Header() {
 
       if (userEmail) {
         try {
-          const res = await fetch(
-            `/api/notifications/?email=${encodeURIComponent(userEmail)}`
-          );
+          const res = await fetch(`/api/notifications/?email=${encodeURIComponent(userEmail)}`);
           if (res.ok) {
             const data = await res.json();
             const backendNotifs = data.map((item: any) => ({
@@ -150,9 +148,7 @@ export default function Header() {
         method: 'POST',
       });
       if (res.ok) {
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, lida: true } : n))
-        );
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, lida: true } : n)));
       }
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
@@ -192,9 +188,14 @@ export default function Header() {
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
         <div className="flex items-center h-16 lg:h-20 xl:h-22">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 mr-auto lg:mr-8 xl:mr-12">
-            <AppLogo size={38} />
-            <span className="font-black text-2xl lg:text-3xl xl:text-4xl tracking-wider text-foreground">NZILA</span>
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 flex-shrink-0 mr-auto lg:mr-8 xl:mr-12"
+          >
+            <AppLogo className="w-10 h-10 lg:w-14 lg:h-14 xl:w-16 xl:h-16" />
+            <span className="font-black text-2xl lg:text-3xl xl:text-4xl tracking-wider text-foreground">
+              NZILA
+            </span>
           </Link>
 
           {/* Desktop Nav */}

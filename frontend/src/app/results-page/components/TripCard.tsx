@@ -42,7 +42,20 @@ const CLASS_STYLES: Record<string, string> = {
 function formatDate(dateStr: string) {
   if (!dateStr) return '';
   const [year, month, day] = dateStr.split('-');
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const months = [
+    'Jan',
+    'Fev',
+    'Mar',
+    'Abr',
+    'Mai',
+    'Jun',
+    'Jul',
+    'Ago',
+    'Set',
+    'Out',
+    'Nov',
+    'Dez',
+  ];
   return `${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
 }
 
@@ -82,7 +95,8 @@ export default function TripCard({ trip }: TripCardProps) {
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).style.display = 'none';
                     (e.currentTarget.parentElement as HTMLElement).classList.add(trip.carrierColor);
-                    (e.currentTarget.parentElement as HTMLElement).innerHTML = `<span class="text-white text-xs font-black tracking-tight">${trip.carrierCode}</span>`;
+                    (e.currentTarget.parentElement as HTMLElement).innerHTML =
+                      `<span class="text-white text-xs font-black tracking-tight">${trip.carrierCode}</span>`;
                   }}
                 />
               ) : (

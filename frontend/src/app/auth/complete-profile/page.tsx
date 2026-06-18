@@ -14,7 +14,9 @@ function CompleteProfileForm() {
   const nameParam = searchParams.get('name') || '';
   const avatarParam = searchParams.get('avatar') || '';
   const tripParam = searchParams.get('trip') || '';
-  const redirectParam = tripParam ? `/payment?trip=${tripParam}` : (searchParams.get('redirect') || '/');
+  const redirectParam = tripParam
+    ? `/payment?trip=${tripParam}`
+    : searchParams.get('redirect') || '/';
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');

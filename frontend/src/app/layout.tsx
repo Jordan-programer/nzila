@@ -28,8 +28,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt" className={nunitoSans.variable}>
-      <head>
-      </head>
+      <head></head>
       <body className={nunitoSans.className}>
         {children}
         <Toaster position="bottom-right" richColors closeButton />
