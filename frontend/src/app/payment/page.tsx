@@ -43,6 +43,16 @@ import {
   Lock,
 } from 'lucide-react';
 
+function getCurrentUser() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem('nzila_current_user');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
