@@ -75,7 +75,7 @@ const values = [
   {
     title: 'Conectividade Nacional',
     description:
-      'Encurtamos as distâncias entre as 18 províncias de Angola, facilitando a circulação de pessoas e bens de forma integrada e transparente.',
+      'Encurtamos as distâncias entre as 20 províncias de Angola, facilitando a circulação de pessoas e bens de forma integrada e transparente.',
     icon: Compass,
     color: 'text-purple-600 bg-purple-50',
   },
