@@ -314,7 +314,7 @@ export default function TripCard({ trip }: TripCardProps) {
               onClick={handleSelect}
               className="flex-1 sm:flex-none px-6 py-2.5 bg-primary text-primary-foreground rounded-xl font-semibold text-sm hover:bg-accent active:scale-95 transition-all duration-150"
             >
-              Selecionar este bilhete
+              Selecionar
             </button>
             <p className="text-xs text-muted-foreground">Sem taxas de reserva adicionais</p>
           </div>
