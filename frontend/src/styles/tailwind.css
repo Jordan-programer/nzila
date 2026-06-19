@@ -29,6 +29,30 @@
   --letter-spacing-ui: -0.01em;
 }
 
+.dark {
+  --background: #0b0f19;
+  --foreground: #f8fafc;
+  --primary: #10b981;
+  --primary-foreground: #0b0f19;
+  --secondary: #1f2937;
+  --secondary-foreground: #94a3b8;
+  --accent: #059669;
+  --accent-foreground: #ffffff;
+  --muted: #1e293b;
+  --muted-foreground: #64748b;
+  --card: #1f2937;
+  --card-foreground: #f8fafc;
+  --border: #2d3748;
+  --input: #2d3748;
+  --ring: #10b981;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --danger: #ef4444;
+  --danger-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #0b0f19;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -200,6 +224,10 @@
 
   .route-card-bg {
     background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  }
+
+  .dark .route-card-bg {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
   }
 
   .step-connector {

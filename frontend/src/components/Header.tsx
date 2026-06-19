@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import { Menu, X, User, LogIn, Bell, ArrowRight } from 'lucide-react';
+import { Menu, X, User, LogIn, Bell, ArrowRight, Sun, Moon } from 'lucide-react';
 import { toast } from 'sonner';
 
 const navLinks = [
@@ -21,6 +21,19 @@ export default function Header() {
   const [user, setUser] = useState<{ name: string; email?: string; role?: string } | null>(null);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    if (nextTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('nzila-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('nzila-theme', 'light');
+    }
+  };
 
   const getDashboardLink = (): string => {
     if (!user) return '/';
@@ -65,6 +78,9 @@ export default function Header() {
   };
 
   useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark');
+    setTheme(isDark ? 'dark' : 'light');
+
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll, { passive: true });
 
@@ -261,6 +277,13 @@ export default function Header() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden lg:flex items-center gap-2 xl:gap-3 ml-auto">
+            <button
+              onClick={toggleTheme}
+              className="p-2 text-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors mr-1"
+              title={theme === 'light' ? 'Ativar Modo Noturno' : 'Ativar Modo Claro'}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             {user ? (
               <div className="flex items-center gap-3">
                 {/* Desktop Notification Bell */}
@@ -391,6 +414,13 @@ export default function Header() {
 
           {/* Mobile actions & Menu Button */}
           <div className="flex items-center gap-2 lg:hidden">
+            <button
+              onClick={toggleTheme}
+              className="p-2 text-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
+              title={theme === 'light' ? 'Ativar Modo Noturno' : 'Ativar Modo Claro'}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             {user && (
               <div className="relative">
                 <button
