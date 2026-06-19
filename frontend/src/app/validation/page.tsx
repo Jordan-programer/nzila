@@ -127,6 +127,11 @@ export default function TicketValidationPage() {
       }
 
       const ticket = resData.ticket;
+      if (ticket) {
+        ticket.passengerName = ticket.passengerName || ticket.passenger_name || '';
+        ticket.passengerEmail = ticket.passengerEmail || ticket.passenger_email || '';
+        ticket.passengerDocument = ticket.passengerDocument || ticket.passenger_document || '';
+      }
       setScannedTicket(ticket);
 
       // Verificar se o utilizador atual é um fiscal e se o bilhete pertence à sua transportadora
@@ -175,6 +180,11 @@ export default function TicketValidationPage() {
         toast.success(`Embarque confirmado com sucesso para ${scannedTicket.passengerName}!`);
 
         const updated = resData.ticket;
+        if (updated) {
+          updated.passengerName = updated.passengerName || updated.passenger_name || '';
+          updated.passengerEmail = updated.passengerEmail || updated.passenger_email || '';
+          updated.passengerDocument = updated.passengerDocument || updated.passenger_document || '';
+        }
         setScannedTicket(updated);
         setValidationResult('ALREADY_USED');
       } catch (err: any) {
@@ -330,7 +340,7 @@ export default function TicketValidationPage() {
                     {/* Passenger Profile */}
                     <div className="flex items-center gap-3 border-b border-border pb-4">
                       <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center font-black text-primary text-lg">
-                        {scannedTicket.passengerName.charAt(0)}
+                        {(scannedTicket.passengerName || '').charAt(0)}
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-foreground">
