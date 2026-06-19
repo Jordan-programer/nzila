@@ -328,13 +328,16 @@ function CheckoutContent() {
             onClick={() => handleSeatClick(seatLabel)}
             className={`w-10 h-10 lg:w-11 lg:h-11 rounded-lg text-xs font-bold border transition-all flex flex-col items-center justify-center select-none ${
               isOccupied
-                ? 'bg-danger/10 border-danger/25 text-danger/50 cursor-not-allowed'
+                ? 'bg-danger/10 border-danger/25 text-danger/50 cursor-not-allowed opacity-60'
                 : isSelected
                   ? 'bg-primary text-white border-primary shadow-md scale-105 ring-2 ring-primary/20'
-                  : 'bg-card border-border hover:border-primary/50 text-foreground hover:bg-primary/5 active:scale-95'
+                  : 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-500/20 hover:border-primary text-foreground hover:bg-emerald-50 dark:hover:bg-emerald-950/20 active:scale-95'
             }`}
           >
             <span>{seatLabel}</span>
+            {isOccupied && <span className="text-[7px] text-danger/60 font-black mt-0.5">X</span>}
+            {isSelected && <span className="text-[7px] text-white/90 font-black mt-0.5">✓</span>}
+            {!isOccupied && !isSelected && <span className="text-[7px] text-primary/60 font-medium mt-0.5">Livre</span>}
           </button>
         );
       }
@@ -384,8 +387,8 @@ function CheckoutContent() {
         {/* Legends */}
         <div className="flex items-center justify-center gap-4 mt-6 flex-wrap border-t border-border pt-4 w-full">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-            <span className="w-3.5 h-3.5 rounded bg-card border border-border inline-block" />
-            <span>Disponível</span>
+            <span className="w-3.5 h-3.5 rounded bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-500/20 inline-block" />
+            <span>Disponível (Livre)</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
             <span className="w-3.5 h-3.5 rounded bg-primary border border-primary inline-block" />
@@ -393,7 +396,7 @@ function CheckoutContent() {
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
             <span className="w-3.5 h-3.5 rounded bg-danger/10 border border-danger/25 text-danger/50 inline-block" />
-            <span>Ocupado</span>
+            <span>Ocupado (X)</span>
           </div>
         </div>
       </div>

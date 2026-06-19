@@ -16,6 +16,7 @@ urlpatterns = [
     path('reservations/', views.manage_reservations, name='manage_reservations'),
     path('reservations/<str:pk>/', views.reservation_details, name='reservation_details'),
     path('reservations/<str:pk>/cancel/', views.cancel_reservation, name='cancel_reservation'),
+    path('reservations/<str:pk>/reschedule/', views.reschedule_reservation, name='reschedule_reservation'),
 
     # Validation APIs (Fiscais)
     path('validation/scan/', views.scan_ticket, name='scan_ticket'),
@@ -47,10 +48,12 @@ urlpatterns = [
     path('carrier/routes/<int:pk>/', views.carrier_manage_routes, name='carrier_manage_route_detail'),
     path('carrier/trips/', views.carrier_manage_trips, name='carrier_manage_trips'),
     path('carrier/trips/<int:pk>/', views.carrier_manage_trips, name='carrier_manage_trip_detail'),
+    path('carrier/trips/<int:trip_id>/operational-cancel/', views.carrier_operational_cancel, name='carrier_operational_cancel'),
     path('carrier/fiscais/', views.carrier_manage_fiscais, name='carrier_manage_fiscais'),
     path('carrier/fiscais/<int:pk>/', views.carrier_manage_fiscais, name='carrier_manage_fiscal_detail'),
     path('carrier/operators/', views.carrier_manage_operators, name='carrier_manage_operators'),
     path('carrier/operators/<int:pk>/', views.carrier_manage_operators, name='carrier_manage_operator_detail'),
+    path('carrier/reservations/', views.carrier_manage_reservations, name='carrier_manage_reservations'),
     path('notifications/', views.list_notifications, name='list_notifications'),
     path('notifications/<str:pk>/read/', views.mark_notification_read, name='mark_notification_read'),
     path('notifications/read-all/', views.mark_all_notifications_read, name='mark_all_notifications_read'),

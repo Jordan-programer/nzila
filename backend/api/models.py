@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+import uuid
 
 # 👤 1. UTILIZADORES (extends User, mapped to table 'users')
 class UserProfile(models.Model):
@@ -21,6 +22,7 @@ class UserProfile(models.Model):
     document = models.CharField(max_length=100, blank=True, null=True)
     avatar = models.URLField(max_length=500, blank=True, null=True)
     company = models.ForeignKey('Company', on_delete=models.SET_NULL, blank=True, null=True, related_name='profiles')
+    wallet_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
 
     class Meta:
         db_table = 'users'
@@ -302,3 +304,55 @@ class PopularRoute(models.Model):
 
     def __str__(self):
         return f"Rota Popular: {self.origem.nome} -> {self.destino.nome}"
+
+
+# 📜 13. POLÍTICAS DE CANCELAMENTO
+class CancelationPolicy(models.Model):
+    company = models.OneToOneField(Company, on_delete=models.CASCADE, related_name='cancelation_policy', null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    allow_reschedule = models.BooleanField(default=True)
+    reschedule_window_hours = models.IntegerField(default=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'cancelation_policies'
+
+    def __str__(self):
+        return f"Política: {self.company.nome if self.company else 'Padrão (Plataforma)'}"
+
+
+# 📊 14. REGRAS DE RETENÇÃO DA POLÍTICA
+class CancelationPolicyRule(models.Model):
+    policy = models.ForeignKey(CancelationPolicy, on_delete=models.CASCADE, related_name='rules')
+    min_hours_before_departure = models.IntegerField()
+    retention_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    flat_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+
+    class Meta:
+        db_table = 'cancelation_policy_rules'
+        unique_together = ('policy', 'min_hours_before_departure')
+
+    def __str__(self):
+        return f"Regra {self.policy.id}: >= {self.min_hours_before_departure}h | Retenção: {self.retention_percentage}% + {self.flat_fee} Kz"
+
+
+# 🔍 15. AUDITORIA FINANCEIRA
+class FinancialAuditLog(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='financial_logs')
+    event_type = models.CharField(max_length=50) # SALE, CUSTOMER_CANCEL, CARRIER_CANCEL, RESCHEDULE
+    gross_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    platform_commission = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    carrier_share = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    administrative_retention = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    refund_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    financial_destination = models.CharField(max_length=50) # WALLET, CARD, CARRIER_PAYOUT
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'financial_audit_logs'
+
+    def __str__(self):
+        return f"Log {self.id} | {self.event_type} | {self.reservation.codigo_reserva}"
+

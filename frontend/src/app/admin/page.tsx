@@ -26,6 +26,7 @@ interface Reservation {
   status: string;
   paymentMethod?: string;
   validationDate?: string;
+  created_at?: string;
 }
 import { toast } from 'sonner';
 import {
@@ -458,6 +459,7 @@ function AdminDashboardContent() {
     fetchLocations();
     fetchCarriers();
     fetchPopularRoutes();
+    fetchAdminTrips();
   }, []);
 
   // Calculations
@@ -465,49 +467,79 @@ function AdminDashboardContent() {
   const activeSales = reservations.filter((r) => r.status !== 'CANCELADO');
   const totalRevenue = activeSales.reduce((sum, r) => sum + r.price, 0);
 
-  // Today's Sales
+  // Today's Sales based on booking date
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayRes = reservations.filter((r) => r.date === todayStr);
+  const todayRes = reservations.filter((r) => {
+    if (!r.created_at) return false;
+    const createdDate = new Date(r.created_at).toISOString().split('T')[0];
+    return createdDate === todayStr;
+  });
   const todaySalesCount = todayRes.length;
   const todayRevenue = todayRes
     .filter((r) => r.status !== 'CANCELADO')
     .reduce((sum, r) => sum + r.price, 0);
 
-  // Dynamic Occupancy rate (Simulated base + actual)
+  // Real Occupancy rate based on active trips
+  const activeTrips = adminTrips.filter((t) => t.status !== 'CANCELADA');
+  const totalCapacity = activeTrips.reduce((sum, t) => sum + (t.totalSeats || 0), 0);
+  const totalOccupied = activeTrips.reduce((sum, t) => sum + ((t.totalSeats || 0) - (t.availableSeats || 0)), 0);
   const occupancyRate =
-    totalSalesCount > 0 ? Math.min(94, Math.round(68 + activeSales.length * 1.5)) : 0;
+    totalCapacity > 0 ? Math.round((totalOccupied / totalCapacity) * 100) : 0;
+
+  // Active trips and routes
+  const activeTripsCount = activeTrips.length;
+  const activeRoutesCount = new Set(
+    activeTrips.map((t) => `${t.origin}-${t.destination}`)
+  ).size;
 
   // Chart 1: Last 7 days Sales Trend
   const generateSalesData = () => {
-    const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-    // Hardcoded baseline + dynamic increments
-    return [
-      { name: 'Seg', Vendas: 18000, Bilhetes: 3 },
-      { name: 'Ter', Vendas: 29000, Bilhetes: 5 },
-      { name: 'Qua', Vendas: 22000, Bilhetes: 4 },
-      { name: 'Qui', Vendas: 31000, Bilhetes: 6 },
-      { name: 'Sex', Vendas: 48000, Bilhetes: 9 },
-      { name: 'Sáb', Vendas: 55000, Bilhetes: 11 },
-      {
-        name: 'Dom',
-        Vendas: todayRevenue > 0 ? 32000 + todayRevenue : 35000,
-        Bilhetes: 7 + todaySalesCount,
-      },
-    ];
+    const data = [];
+    const daysOfWeek = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = daysOfWeek[d.getDay()];
+      
+      const dayRes = reservations.filter((r) => {
+        if (!r.created_at) return false;
+        return new Date(r.created_at).toISOString().split('T')[0] === dateStr;
+      });
+      
+      const ticketsCount = dayRes.length;
+      const revenue = dayRes
+        .filter((r) => r.status !== 'CANCELADO')
+        .reduce((sum, r) => sum + r.price, 0);
+        
+      data.push({
+        name: dayName,
+        Vendas: revenue,
+        Bilhetes: ticketsCount,
+      });
+    }
+    return data;
   };
 
   // Chart 2: Carrier sales breakdown
   const generateCarrierData = () => {
-    const carriers = ['MACON', 'TRANSLUX', 'SGO', 'UNITRANS'];
-    return carriers.map((code) => {
-      const count = reservations.filter(
-        (r) => r.carrierCode === code && r.status !== 'CANCELADO'
-      ).length;
-      const baseCount = code === 'MACON' ? 88 : code === 'TRANSLUX' ? 62 : code === 'SGO' ? 44 : 28;
+    const uniqueCarriers = Array.from(new Set(reservations.map(r => r.carrier).filter(Boolean)));
+    if (uniqueCarriers.length === 0) {
+      return [
+        { name: 'Sem Dados', Bilhetes: 0, Receita: 0 }
+      ];
+    }
+    return uniqueCarriers.map((carrierName) => {
+      const carrierRes = reservations.filter(
+        (r) => r.carrier === carrierName && r.status !== 'CANCELADO'
+      );
+      const count = carrierRes.length;
+      const revenue = carrierRes.reduce((sum, r) => sum + r.price, 0);
       return {
-        name: code,
-        Bilhetes: baseCount + count * 5,
-        Receita: (baseCount + count * 5) * 5000,
+        name: carrierName.toUpperCase(),
+        Bilhetes: count,
+        Receita: revenue,
       };
     });
   };
@@ -1145,8 +1177,8 @@ function AdminDashboardContent() {
                   },
                   {
                     title: 'Viagens Ativas',
-                    val: '8 Rotas',
-                    desc: 'Macon, Translux, SGO',
+                    val: `${activeTripsCount} Partidas`,
+                    desc: `${activeRoutesCount} rotas em serviço`,
                     icon: Calendar,
                     col: 'text-amber-600',
                   },

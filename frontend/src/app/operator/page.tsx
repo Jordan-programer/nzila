@@ -108,7 +108,7 @@ export default function OperatorDashboardPage() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [company, setCompany] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<
-    'frota' | 'localidades' | 'rotas' | 'viagens' | 'fiscais' | 'operadores' | 'perfil'
+    'frota' | 'localidades' | 'rotas' | 'viagens' | 'reservas' | 'fiscais' | 'operadores' | 'perfil'
   >('frota');
 
   // Loading States
@@ -120,6 +120,8 @@ export default function OperatorDashboardPage() {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [searchReservationQuery, setSearchReservationQuery] = useState('');
 
   // Form Modals / Forms States
   const [isBusModalOpen, setIsBusModalOpen] = useState(false);
@@ -288,6 +290,17 @@ export default function OperatorDashboardPage() {
       if (!res.ok) throw new Error('API Error');
       const data = await res.json();
       setOperators(data);
+    } catch (err) {
+      // Non-critical, suppress error
+    }
+
+    // 8. Fetch Reservations
+    try {
+      const res = await fetch(`/api/carrier/reservations/?company_id=${companyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReservations(data);
+      }
     } catch (err) {
       // Non-critical, suppress error
     }
@@ -866,7 +879,7 @@ export default function OperatorDashboardPage() {
     };
 
     try {
-      const res = await fetch(`/api/carrier/info/`, {
+      const res = await fetch(`/api/carrier/info/?company_id=${companyId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1964,6 +1977,7 @@ export default function OperatorDashboardPage() {
                 { id: 'localidades', label: 'Localidades', icon: MapPin },
                 { id: 'rotas', label: 'Rotas', icon: Map },
                 { id: 'viagens', label: 'Viagens / Escalas', icon: Calendar },
+                { id: 'reservas', label: 'Reservas', icon: Ticket },
                 { id: 'fiscais', label: 'Fiscais', icon: ShieldCheck },
                 { id: 'operadores', label: 'Operadores', icon: Users },
                 { id: 'perfil', label: 'Perfil Empresa', icon: Building2 },
@@ -2377,6 +2391,150 @@ export default function OperatorDashboardPage() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB: RESERVAS */}
+          {activeTab === 'reservas' && (
+            <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 animate-fade-in font-sans">
+              <div className="flex items-center justify-between border-b border-border pb-4 flex-wrap gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Reservas de Viagem</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Consulte as passagens compradas para as suas viagens e verifique os dados dos passageiros.
+                  </p>
+                </div>
+                {/* Search box */}
+                <div className="relative w-full sm:w-72">
+                  <input
+                    type="text"
+                    placeholder="Pesquisar por passageiro ou código..."
+                    value={searchReservationQuery}
+                    onChange={(e) => setSearchReservationQuery(e.target.value)}
+                    className="w-full pl-3 pr-8 py-2 border border-input rounded-xl text-xs bg-background text-foreground focus:outline-none focus:border-primary"
+                  />
+                  {searchReservationQuery && (
+                    <button
+                      onClick={() => setSearchReservationQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {isLoadingData ? (
+                <div className="text-center py-12 text-muted-foreground font-bold">
+                  A carregar histórico de reservas...
+                </div>
+              ) : reservations.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  Nenhuma reserva efetuada para a sua transportadora até ao momento.
+                </div>
+              ) : (() => {
+                const filteredReservations = reservations.filter((res) => {
+                  const query = searchReservationQuery.toLowerCase();
+                  return (
+                    res.codigo_reserva?.toLowerCase().includes(query) ||
+                    res.passenger_name?.toLowerCase().includes(query) ||
+                    res.passenger_document?.toLowerCase().includes(query)
+                  );
+                });
+
+                if (filteredReservations.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-muted-foreground">
+                      Nenhuma reserva encontrada para a pesquisa &quot;{searchReservationQuery}&quot;.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto text-xs">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-border/80 text-muted-foreground font-black uppercase tracking-wider text-[9px] bg-muted/40">
+                          <th className="p-3">Código / Data Reserva</th>
+                          <th className="p-3">Passageiro / Documento</th>
+                          <th className="p-3">Contacto</th>
+                          <th className="p-3">Rota / Viagem</th>
+                          <th className="p-3">Poltrona</th>
+                          <th className="p-3">Preço</th>
+                          <th className="p-3">Pagamento</th>
+                          <th className="p-3">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {filteredReservations.map((res) => (
+                          <tr key={`res-${res.codigo_reserva}`} className="hover:bg-muted/10 font-medium">
+                            <td className="p-3">
+                              <span className="block font-bold text-foreground font-mono">
+                                {res.codigo_reserva}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground block">
+                                {new Date(res.created_at).toLocaleDateString('pt-AO', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span className="block font-bold text-foreground">{res.passenger_name}</span>
+                              <span className="text-[10px] text-muted-foreground block">
+                                B.I.: {res.passenger_document || '—'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-muted-foreground font-sans">
+                              <span>{res.passenger_phone || '—'}</span>
+                              <span className="block text-[10px] text-muted-foreground/80">{res.passenger_email}</span>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-1 font-bold text-foreground">
+                                <span>{res.origin}</span>
+                                <span className="text-muted-foreground">→</span>
+                                <span>{res.destination}</span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground block">
+                                Partida: {res.date} às {res.departureTime}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <span className="px-2 py-0.5 bg-primary/10 text-primary border border-primary/20 rounded font-black text-[10px]">
+                                {res.seat}
+                              </span>
+                            </td>
+                            <td className="p-3 font-bold text-foreground">
+                              {res.price?.toLocaleString('pt-AO')} Kz
+                            </td>
+                            <td className="p-3">
+                              <span className="text-muted-foreground">{res.paymentMethod}</span>
+                            </td>
+                            <td className="p-3">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${
+                                  res.status === 'CONFIRMADO'
+                                    ? 'bg-success/15 text-success border-success/30'
+                                    : res.status === 'CANCELADO'
+                                      ? 'bg-danger/15 text-danger border-danger/30'
+                                      : res.status === 'EMBARCADO'
+                                        ? 'bg-blue-500/15 text-blue-500 border-blue-500/30'
+                                        : 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                }`}
+                              >
+                                {res.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
