@@ -10,7 +10,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from django.db.models import Sum
+from django.db.models import Sum, Q
 
 from .models import (
     UserProfile, Company, Location, Route, Bus, Seat,
@@ -248,9 +248,9 @@ def list_trips(request):
     date = request.query_params.get('date')
 
     if origin:
-        trips = trips.filter(route__origem__provincia__icontains=origin)
+        trips = trips.filter(Q(route__origem__provincia__icontains=origin) | Q(route__origem__nome__icontains=origin))
     if destination:
-        trips = trips.filter(route__destino__provincia__icontains=destination)
+        trips = trips.filter(Q(route__destino__provincia__icontains=destination) | Q(route__destino__nome__icontains=destination))
     if date:
         trips = trips.filter(data_saida=date)
     if class_type:
@@ -580,7 +580,6 @@ def manage_locations(request):
         company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
 
     if request.method == 'GET':
-        from django.db.models import Q
         if company_id:
             locations = Location.objects.filter(Q(company_id=company_id) | Q(company__isnull=True)).order_by('nome')
         else:

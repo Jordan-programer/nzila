@@ -56,7 +56,7 @@ export default function PopularRoutes() {
           {routes?.map((route) => (
             <Link
               key={route?.key}
-              href={`/results-page?origin=${encodeURIComponent(route?.origin)}&destination=${encodeURIComponent(route?.destination)}`}
+              href={`/results-page?origem=${encodeURIComponent(route?.origin)}&destino=${encodeURIComponent(route?.destination)}`}
               className="group bg-card border border-border rounded-2xl overflow-hidden card-hover block"
             >
               {/* Image Banner */}

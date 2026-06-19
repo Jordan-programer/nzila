@@ -7,8 +7,8 @@ import { ArrowRight, Calendar, Pencil } from 'lucide-react';
 
 export default function SearchSummaryBar() {
   const searchParams = useSearchParams();
-  const origin = searchParams.get('origem') || '';
-  const destination = searchParams.get('destino') || '';
+  const origin = searchParams.get('origem') || searchParams.get('origin') || '';
+  const destination = searchParams.get('destino') || searchParams.get('destination') || '';
   const date = searchParams.get('data') || '';
   const returnDate = searchParams.get('volta') || '';
   const travelClass = searchParams.get('classe') || 'economica';
