@@ -27,7 +27,7 @@ const footerLinks = {
 
 export default function Footer() {
   return (
-    <footer className="bg-foreground text-white" style={{ marginTop: '2rem' }}>
+    <footer className="bg-[#0a0f1e] text-white" style={{ marginTop: '2rem' }}>
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-8 lg:gap-12">
           {/* Brand */}
