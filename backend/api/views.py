@@ -237,7 +237,11 @@ def social_login_user(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_trips(request):
-    trips = Trip.objects.filter(status='ATIVA')
+    trips = Trip.objects.filter(status='ATIVA').select_related(
+        'empresa', 'route', 'route__origem', 'route__destino', 'bus'
+    ).prefetch_related(
+        'reservations__reservation_seats__seat'
+    )
 
     # Apply filters
     origin = request.query_params.get('origin')
@@ -266,7 +270,11 @@ def list_trips(request):
 @permission_classes([AllowAny])
 def trip_details(request, pk):
     try:
-        trip = Trip.objects.get(pk=pk)
+        trip = Trip.objects.select_related(
+            'empresa', 'route', 'route__origem', 'route__destino', 'bus'
+        ).prefetch_related(
+            'reservations__reservation_seats__seat'
+        ).get(pk=pk)
     except Trip.DoesNotExist:
         return Response({'error': 'Viagem não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -1160,9 +1168,17 @@ def carrier_manage_trips(request, pk=None):
         from django.db.models import Case, When, Value, IntegerField
         status_order = Case(When(status='ATIVA', then=Value(0)), default=Value(1), output_field=IntegerField())
         if not company_id:
-            trips = Trip.objects.all().annotate(status_order=status_order).order_by('status_order', 'data_saida', 'hora_saida')
+            trips = Trip.objects.all().select_related(
+                'empresa', 'route', 'route__origem', 'route__destino', 'bus'
+            ).prefetch_related(
+                'reservations__reservation_seats__seat'
+            ).annotate(status_order=status_order).order_by('status_order', 'data_saida', 'hora_saida')
         else:
-            trips = Trip.objects.filter(empresa_id=company_id).annotate(status_order=status_order).order_by('status_order', 'data_saida', 'hora_saida')
+            trips = Trip.objects.filter(empresa_id=company_id).select_related(
+                'empresa', 'route', 'route__origem', 'route__destino', 'bus'
+            ).prefetch_related(
+                'reservations__reservation_seats__seat'
+            ).annotate(status_order=status_order).order_by('status_order', 'data_saida', 'hora_saida')
         serializer = TripSerializer(trips, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

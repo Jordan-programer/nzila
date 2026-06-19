@@ -171,21 +171,22 @@ class TripSerializer(serializers.ModelSerializer):
         return mapping.get(obj.classe, obj.classe.capitalize())
 
     def get_availableSeats(self, obj):
-        occupied = ReservationSeat.objects.filter(
-            reservation__trip=obj,
-            reservation__status__in=['CONFIRMADA', 'EMBARCADO']
-        ).count()
+        occupied = 0
+        for reservation in obj.reservations.all():
+            if reservation.status in ['CONFIRMADA', 'EMBARCADO']:
+                occupied += len(reservation.reservation_seats.all())
         return max(0, obj.bus.capacidade - occupied)
 
     def get_amenities(self, obj):
         return obj.get_amenities_list()
 
     def get_occupiedSeats(self, obj):
-        seats = ReservationSeat.objects.filter(
-            reservation__trip=obj,
-            reservation__status__in=['CONFIRMADA', 'EMBARCADO']
-        ).values_list('seat__numero', flat=True)
-        return list(seats)
+        seats = []
+        for reservation in obj.reservations.all():
+            if reservation.status in ['CONFIRMADA', 'EMBARCADO']:
+                for res_seat in reservation.reservation_seats.all():
+                    seats.append(res_seat.seat.numero)
+        return seats
 
 class ReservationSerializer(serializers.ModelSerializer):
     trip_details = TripSerializer(source='trip', read_only=True)
