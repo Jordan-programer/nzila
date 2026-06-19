@@ -40,6 +40,22 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   document.documentElement.classList.remove('dark');
                 }
               } catch (e) {}
+
+              // Auto-reload on ChunkLoadError / Loading chunk failed
+              window.addEventListener('error', function(e) {
+                var message = e.message || '';
+                if (message.indexOf('ChunkLoadError') !== -1 || message.indexOf('Loading chunk') !== -1 || message.indexOf('Failed to fetch') !== -1) {
+                  window.location.reload();
+                }
+              }, true);
+
+              window.addEventListener('unhandledrejection', function(e) {
+                var reason = e.reason || {};
+                var message = reason.message || '';
+                if (message.indexOf('ChunkLoadError') !== -1 || message.indexOf('Loading chunk') !== -1 || message.indexOf('Failed to fetch') !== -1) {
+                  window.location.reload();
+                }
+              });
             `,
           }}
         />
