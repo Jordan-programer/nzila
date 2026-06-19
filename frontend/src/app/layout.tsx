@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description:
     'Reserve a sua passagem de autocarro entre províncias de Angola online em poucos minutos. Bilhete digital com QR Code.',
   icons: {
-    icon: [{ url: '/favicon.ico', type: 'image/x-icon' }],
+    icon: '/favicon.ico',
   },
 };
 
