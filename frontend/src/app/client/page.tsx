@@ -36,6 +36,7 @@ interface Reservation {
   status: string;
   paymentMethod?: string;
   validationDate?: string;
+  trip: string | number;
 }
 
 interface SimulatedEmail {
@@ -43,7 +44,8 @@ interface SimulatedEmail {
   recipient: string;
   subject: string;
   snippet: string;
-  sentAt?: string;
+  sentAt: string;
+  reservationData?: Reservation;
 }
 import { toast } from 'sonner';
 import {
@@ -64,6 +66,7 @@ import {
   FileDown,
   Loader2,
   CheckCircle,
+  DollarSign,
 } from 'lucide-react';
 
 export default function ClientDashboardPage() {
@@ -80,6 +83,13 @@ export default function ClientDashboardPage() {
   const [selectedTicket, setSelectedTicket] = useState<Reservation | null>(null);
   const [cancellationTarget, setCancellationTarget] = useState<Reservation | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<SimulatedEmail | null>(null);
+  const [reschedulingTarget, setReschedulingTarget] = useState<Reservation | null>(null);
+  const [carrierTrips, setCarrierTrips] = useState<any[]>([]);
+  const [selectedNewTripId, setSelectedNewTripId] = useState<string>('');
+  const [isLoadingTripsForCarrier, setIsLoadingTripsForCarrier] = useState(false);
+  const [fareDiffMessage, setFareDiffMessage] = useState<string | null>(null);
+  const [fareDiffAmount, setFareDiffAmount] = useState<number | null>(null);
+  const [isConfirmingFareDiff, setIsConfirmingFareDiff] = useState(false);
 
   // Profile forms
   const [profileName, setProfileName] = useState('');
@@ -210,11 +220,13 @@ export default function ClientDashboardPage() {
         const res = await fetch(`/api/reservations/${cancellationTarget.id}/cancel/`, {
           method: 'POST',
           headers: {
+            'Content-Type': 'application/json',
             Authorization: `Token ${(user as any).token}`,
           },
         });
         if (res.ok) {
-          toast.success(`Reserva ${cancellationTarget.id} cancelada com sucesso!`);
+          const data = await res.json();
+          toast.success(data.success || `Solicitação de cancelamento enviada com sucesso!`);
           fetchBackendReservations((user as any).token);
         } else {
           throw new Error('Cancel failed');
@@ -224,6 +236,63 @@ export default function ClientDashboardPage() {
         toast.error('Erro ao cancelar a viagem no servidor.');
       }
       setCancellationTarget(null);
+    }
+  };
+
+  const handleStartRescheduling = async (res: Reservation) => {
+    setReschedulingTarget(res);
+    setIsLoadingTripsForCarrier(true);
+    setFareDiffMessage(null);
+    setFareDiffAmount(null);
+    setIsConfirmingFareDiff(false);
+    setSelectedNewTripId('');
+    try {
+      const response = await fetch(`/api/trips/?carrier=${res.carrierCode}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Filter out original trip, and keep only active trips
+        const filtered = data.filter((t: any) => String(t.id) !== String(res.trip));
+        setCarrierTrips(filtered);
+      }
+    } catch (error) {
+      console.error('Error fetching carrier trips:', error);
+      toast.error('Erro ao carregar viagens da transportadora.');
+    } finally {
+      setIsLoadingTripsForCarrier(false);
+    }
+  };
+
+  const handleConfirmReschedule = async (confirmPayment = false) => {
+    if (!reschedulingTarget || !selectedNewTripId || !user || !user.token) return;
+    try {
+      const res = await fetch(`/api/reservations/${reschedulingTarget.id}/reschedule/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Token ${user.token}`,
+        },
+        body: JSON.stringify({
+          new_trip_id: selectedNewTripId,
+          confirm_payment: confirmPayment,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.payment_required) {
+          setFareDiffMessage(data.message);
+          setFareDiffAmount(data.fare_difference);
+          setIsConfirmingFareDiff(true);
+        } else {
+          toast.success(data.success || 'Viagem remarcada com sucesso!');
+          fetchBackendReservations(user.token);
+          setReschedulingTarget(null);
+        }
+      } else {
+        toast.error(data.error || 'Erro ao remarcar a viagem.');
+      }
+    } catch (error) {
+      console.error('Error rescheduling:', error);
+      toast.error('Erro ao processar remarcação.');
     }
   };
 
@@ -245,7 +314,7 @@ export default function ClientDashboardPage() {
 
   // Filters for tabs
   const upcomingRes = reservations.filter(
-    (r) => r.status === 'CONFIRMADO' || r.status === 'PENDENTE'
+    (r) => r.status === 'CONFIRMADO' || r.status === 'PENDENTE' || r.status === 'PENDENTE_CANCELAMENTO'
   );
   const pastRes = reservations.filter(
     (r) => r.status === 'UTILIZADO' || r.status === 'EMBARCADO' || r.status === 'CANCELADO'
@@ -263,6 +332,8 @@ export default function ClientDashboardPage() {
         return 'bg-slate-500/15 border-slate-500/30 text-slate-600';
       case 'CANCELADO':
         return 'bg-danger/15 border-danger/30 text-danger';
+      case 'PENDENTE_CANCELAMENTO':
+        return 'bg-amber-500/15 border-amber-500/30 text-amber-600';
       default:
         return 'bg-muted text-muted-foreground border-border';
     }
@@ -450,6 +521,128 @@ export default function ClientDashboardPage() {
                 <Trash2 size={15} />
                 Solicitar Cancelamento
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rescheduling Modal Overlay */}
+      {reschedulingTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-lg font-bold text-foreground">Remarcar Viagem</h3>
+              <button
+                onClick={() => setReschedulingTarget(null)}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+              <div className="p-3.5 bg-muted/40 rounded-2xl border border-border text-xs space-y-1.5">
+                <span className="block text-[9px] text-muted-foreground font-black uppercase">
+                  Viagem Atual ({reschedulingTarget.carrier})
+                </span>
+                <div className="font-bold text-foreground">
+                  {reschedulingTarget.origin} → {reschedulingTarget.destination}
+                </div>
+                <div className="text-muted-foreground">
+                  Poltrona: {reschedulingTarget.seat} | Preço original: {reschedulingTarget.price.toLocaleString('pt-AO')} Kz
+                </div>
+              </div>
+
+              {!isConfirmingFareDiff ? (
+                <>
+                  <label className="block text-xs font-semibold text-muted-foreground">
+                    Selecione uma Nova Data/Hora da mesma transportadora:
+                  </label>
+                  
+                  {isLoadingTripsForCarrier ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="animate-spin text-primary w-6 h-6" />
+                    </div>
+                  ) : carrierTrips.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-muted-foreground">
+                      Não existem outras viagens disponíveis para esta transportadora.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {carrierTrips.map((trip) => (
+                        <button
+                          key={trip.id}
+                          onClick={() => setSelectedNewTripId(String(trip.id))}
+                          className={`w-full p-3.5 border rounded-2xl text-left text-xs font-semibold transition-all flex justify-between items-center ${
+                            selectedNewTripId === String(trip.id)
+                              ? 'border-primary bg-primary/5 text-primary shadow-xs'
+                              : 'border-border hover:bg-muted text-foreground'
+                          }`}
+                        >
+                          <div>
+                            <div className="font-bold text-foreground">
+                              {trip.date} às {trip.departureTime}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5">
+                              Classe: {trip.classLabel} | {trip.availableSeats} lugares disp.
+                            </div>
+                          </div>
+                          <div className="font-bold text-emerald-600">
+                            {trip.price.toLocaleString('pt-AO')} Kz
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-4 text-center py-4">
+                  <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mx-auto text-amber-600 animate-pulse">
+                    <DollarSign size={24} />
+                  </div>
+                  <h4 className="text-sm font-bold text-foreground">Diferença Tarifária a Pagar</h4>
+                  <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                    {fareDiffMessage}
+                  </p>
+                  <div className="text-xl font-black text-emerald-600">
+                    +{fareDiffAmount?.toLocaleString('pt-AO')} Kz
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-3 border-t border-border">
+              <button
+                onClick={() => {
+                  if (isConfirmingFareDiff) {
+                    setIsConfirmingFareDiff(false);
+                    setFareDiffMessage(null);
+                    setFareDiffAmount(null);
+                  } else {
+                    setReschedulingTarget(null);
+                  }
+                }}
+                className="flex-1 py-2.5 border border-border rounded-xl text-xs font-bold hover:bg-muted text-muted-foreground transition-colors"
+              >
+                Voltar
+              </button>
+              
+              {!isConfirmingFareDiff ? (
+                <button
+                  disabled={!selectedNewTripId}
+                  onClick={() => handleConfirmReschedule(false)}
+                  className="flex-1 py-2.5 bg-primary disabled:opacity-40 text-primary-foreground hover:bg-accent font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  Continuar
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleConfirmReschedule(true)}
+                  className="flex-1 py-2.5 bg-emerald-600 text-white hover:bg-emerald-700 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  Pagar e Confirmar
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -730,13 +923,22 @@ export default function ClientDashboardPage() {
                                 <Mail size={14} />
                               </button>
                               {res.status === 'CONFIRMADO' && (
-                                <button
-                                  onClick={() => setCancellationTarget(res)}
-                                  title="Solicitar Cancelamento"
-                                  className="p-2 border border-danger/20 hover:bg-danger/5 text-danger rounded-lg transition-colors"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleStartRescheduling(res)}
+                                    title="Remarcar Viagem"
+                                    className="p-2 border border-primary/25 hover:bg-primary/5 text-primary rounded-lg transition-colors flex items-center justify-center"
+                                  >
+                                    <Calendar size={14} />
+                                  </button>
+                                  <button
+                                    onClick={() => setCancellationTarget(res)}
+                                    title="Solicitar Cancelamento"
+                                    className="p-2 border border-danger/20 hover:bg-danger/5 text-danger rounded-lg transition-colors flex items-center justify-center"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>

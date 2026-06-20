@@ -62,6 +62,7 @@ import {
   Plus,
   Loader2,
   ArrowRight,
+  CheckCircle,
 } from 'lucide-react';
 
 function AdminDashboardContent() {
@@ -565,35 +566,51 @@ function AdminDashboardContent() {
 
   const handleCancelRes = async (id: string) => {
     try {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('nzila_current_user') : null;
+      const currentUser = stored ? JSON.parse(stored) : null;
+      const token = currentUser?.token;
+
       const res = await fetch(`/api/reservations/${id}/cancel/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+        },
       });
       if (res.ok) {
         toast.success(`Reserva ${id} cancelada com sucesso.`);
         await refreshReservations();
       } else {
-        throw new Error('Cancel failed');
+        const data = await res.json();
+        throw new Error(data.error || 'Cancel failed');
       }
-    } catch (err) {
-      toast.error('Erro ao cancelar a reserva no servidor.');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao cancelar a reserva no servidor.');
     }
   };
 
   const handleRefundRes = async (id: string) => {
     try {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('nzila_current_user') : null;
+      const currentUser = stored ? JSON.parse(stored) : null;
+      const token = currentUser?.token;
+
       const res = await fetch(`/api/reservations/${id}/cancel/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+        },
       });
       if (res.ok) {
-        toast.success(`Reserva ${id} reembolsada. Valor devolvido ao passageiro.`);
+        toast.success(`Reserva ${id} reembolsada com sucesso.`);
         await refreshReservations();
       } else {
-        throw new Error('Refund failed');
+        const data = await res.json();
+        throw new Error(data.error || 'Refund failed');
       }
-    } catch (err) {
-      toast.error('Erro ao processar o reembolso no servidor.');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao processar o reembolso no servidor.');
     }
   };
 
@@ -626,6 +643,8 @@ function AdminDashboardContent() {
         return 'bg-slate-500/10 border-slate-500/20 text-slate-600';
       case 'CANCELADO':
         return 'bg-danger/10 border-danger/20 text-danger';
+      case 'PENDENTE_CANCELAMENTO':
+        return 'bg-amber-500/10 border-amber-500/20 text-amber-600';
       default:
         return 'bg-muted text-muted-foreground border-border';
     }
@@ -1282,6 +1301,23 @@ function AdminDashboardContent() {
           {/* Tab 2: Reservations Management Grid */}
           {adminTab === 'reservas' && (
             <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm animate-fade-in">
+              {reservations.filter((r) => r.status === 'PENDENTE_CANCELAMENTO').length > 0 && (
+                <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs font-bold text-amber-600 animate-pulse">
+                  <span className="inline-block w-2.5 h-2.5 bg-amber-500 rounded-full flex-shrink-0" />
+                  <div className="flex-1">
+                    Atenção: Existem {reservations.filter((r) => r.status === 'PENDENTE_CANCELAMENTO').length} solicitações de cancelamento pendentes de aprovação administrativa.
+                  </div>
+                  <button
+                    onClick={() => {
+                      setStatusFilter('PENDENTE_CANCELAMENTO');
+                    }}
+                    className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 rounded-lg text-[10px] uppercase font-black transition-all"
+                  >
+                    Filtrar Solicitações
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-6 border-b border-border pb-4 flex-wrap gap-4">
                 <h2 className="text-lg font-bold text-foreground">
                   Lista Geral de Reservas do Sistema
@@ -1309,6 +1345,7 @@ function AdminDashboardContent() {
                     <option value="embarcado">Embarcado</option>
                     <option value="utilizado">Utilizado</option>
                     <option value="cancelado">Cancelado</option>
+                    <option value="pendente_cancelamento">Pendente Cancelamento</option>
                   </select>
                 </div>
               </div>
@@ -1410,6 +1447,16 @@ function AdminDashboardContent() {
                                   <Undo2 size={12} />
                                 </button>
                               </>
+                            )}
+                            {res.status === 'PENDENTE_CANCELAMENTO' && (
+                              <button
+                                onClick={() => handleCancelRes(res.id)}
+                                title="Aprovar Cancelamento"
+                                className="px-2 py-1 border border-success/35 bg-success/5 hover:bg-success/15 text-success rounded-lg font-bold text-[10px] uppercase flex items-center gap-1 transition-all"
+                              >
+                                <CheckCircle size={10} />
+                                Aprovar Cancelamento
+                              </button>
                             )}
                           </td>
                         </tr>

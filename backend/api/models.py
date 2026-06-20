@@ -205,6 +205,7 @@ class Reservation(models.Model):
         ('CONFIRMADA', 'CONFIRMADA'),
         ('CANCELADA', 'CANCELADA'),
         ('EMBARCADO', 'EMBARCADO'),
+        ('PENDENTE_CANCELAMENTO', 'PENDENTE_CANCELAMENTO'),
     ]
     codigo_reserva = models.CharField(max_length=50, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reservations')

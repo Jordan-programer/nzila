@@ -445,101 +445,136 @@ def cancel_reservation(request, pk):
         except Reservation.DoesNotExist:
             return Response({'error': 'Reserva não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if reservation.user.email != request.user.email and not getattr(request.user.profile, 'role', '') == 'ADMIN':
-        return Response({'error': 'Não tem permissão para cancelar este bilhete.'}, status=status.HTTP_403_FORBIDDEN)
+    user_profile = getattr(request.user, 'profile', None)
+    user_role = user_profile.role if user_profile else 'CLIENTE'
 
-    if reservation.status == 'CANCELADA':
-        return Response({'error': 'Este bilhete já está cancelado.'}, status=status.HTTP_400_BAD_REQUEST)
+    if user_role == 'CLIENTE':
+        if reservation.user.email != request.user.email:
+            return Response({'error': 'Não tem permissão para cancelar este bilhete.'}, status=status.HTTP_403_FORBIDDEN)
 
-    # 1. Fetch policy
-    policy = CancelationPolicy.objects.filter(company_id=reservation.trip.empresa_id, is_active=True).first()
-    if not policy:
-        # Fallback policy
-        policy = CancelationPolicy.objects.filter(company_id__isnull=True, is_active=True).first()
+        if reservation.status == 'CANCELADA':
+            return Response({'error': 'Este bilhete já está cancelado.'}, status=status.HTTP_400_BAD_REQUEST)
+        if reservation.status == 'PENDENTE_CANCELAMENTO':
+            return Response({'error': 'Este bilhete já tem uma solicitação de cancelamento pendente.'}, status=status.HTTP_400_BAD_REQUEST)
+        if reservation.status != 'CONFIRMADA':
+            return Response({'error': 'Não é possível cancelar um bilhete que não esteja confirmado.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # 2. Calculate time remaining until departure
-    departure_date = reservation.trip.data_saida
-    departure_time = reservation.trip.hora_saida
-    departure_datetime = datetime.combine(departure_date, departure_time)
-    
-    if settings.USE_TZ:
-        import pytz
-        tz = pytz.timezone(settings.TIME_ZONE)
-        departure_datetime = tz.localize(departure_datetime)
-    else:
-        departure_datetime = timezone.make_aware(departure_datetime)
+        with transaction.atomic():
+            reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
+            reservation.status = 'PENDENTE_CANCELAMENTO'
+            reservation.save()
 
-    current_time = timezone.now()
-    time_difference = departure_datetime - current_time
-    hours_before_departure = time_difference.total_seconds() / 3600.0
+            # Create notification for all admin users in the database
+            admins = UserProfile.objects.filter(role='ADMIN')
+            for admin_profile in admins:
+                Notification.objects.create(
+                    user=admin_profile.user,
+                    tipo='CANCELAMENTO',
+                    mensagem=f"Solicitação de cancelamento para a reserva {reservation.codigo_reserva} por {user_profile.nome if user_profile else request.user.username}.",
+                    enviado=True
+                )
 
-    if hours_before_departure <= 0:
-        return Response({'error': 'A viagem já iniciou ou foi concluída.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'success': 'Solicitação de cancelamento enviada com sucesso ao administrador.',
+            'status': 'PENDENTE_CANCELAMENTO'
+        }, status=status.HTTP_200_OK)
 
-    retention_percentage = Decimal('100.00')
-    flat_fee = Decimal('0.00')
+    elif user_role == 'ADMIN':
+        if reservation.status == 'CANCELADA':
+            return Response({'error': 'Este bilhete já está cancelado.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if policy:
-        rules = policy.rules.all().order_by('-min_hours_before_departure')
-        selected_rule = None
-        for rule in rules:
-            if hours_before_departure >= rule.min_hours_before_departure:
-                selected_rule = rule
-                break
+        # 1. Fetch policy
+        policy = CancelationPolicy.objects.filter(company_id=reservation.trip.empresa_id, is_active=True).first()
+        if not policy:
+            # Fallback policy
+            policy = CancelationPolicy.objects.filter(company_id__isnull=True, is_active=True).first()
+
+        # 2. Calculate time remaining until departure
+        departure_date = reservation.trip.data_saida
+        departure_time = reservation.trip.hora_saida
+        departure_datetime = datetime.combine(departure_date, departure_time)
         
-        if selected_rule:
-            retention_percentage = selected_rule.retention_percentage
-            flat_fee = selected_rule.flat_fee
+        if settings.USE_TZ:
+            import pytz
+            tz = pytz.timezone(settings.TIME_ZONE)
+            departure_datetime = tz.localize(departure_datetime)
+        else:
+            departure_datetime = timezone.make_aware(departure_datetime)
 
-    gross_amount = reservation.total
-    retention_ratio = Decimal(retention_percentage) / Decimal('100.00')
-    retention_from_percent = gross_amount * retention_ratio
-    retention_amount = min(retention_from_percent + Decimal(flat_fee), gross_amount)
-    refund_amount = gross_amount - retention_amount
+        current_time = timezone.now()
+        time_difference = departure_datetime - current_time
+        hours_before_departure = time_difference.total_seconds() / 3600.0
 
-    refund_method = request.data.get('refund_method', 'WALLET') # WALLET, CARD
+        if hours_before_departure <= 0:
+            return Response({'error': 'A viagem já iniciou ou foi concluída.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    with transaction.atomic():
-        reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
-        reservation.status = 'CANCELADA'
-        reservation.save()
+        retention_percentage = Decimal('100.00')
+        flat_fee = Decimal('0.00')
 
-        # Update wallet balance if method is WALLET
-        if refund_method == 'WALLET':
-            profile = reservation.user.profile
-            profile.wallet_balance += refund_amount
-            profile.save()
+        if policy:
+            rules = policy.rules.all().order_by('-min_hours_before_departure')
+            selected_rule = None
+            for rule in rules:
+                if hours_before_departure >= rule.min_hours_before_departure:
+                    selected_rule = rule
+                    break
+            
+            if selected_rule:
+                retention_percentage = selected_rule.retention_percentage
+                flat_fee = selected_rule.flat_fee
 
-        # Platform commission & carrier share simulations (10% platform commission)
-        platform_commission = gross_amount * Decimal('0.10')
-        carrier_share = gross_amount - platform_commission
+        gross_amount = reservation.total
+        retention_ratio = Decimal(retention_percentage) / Decimal('100.00')
+        retention_from_percent = gross_amount * retention_ratio
+        retention_amount = min(retention_from_percent + Decimal(flat_fee), gross_amount)
+        refund_amount = gross_amount - retention_amount
 
-        # Create financial audit log entry
-        FinancialAuditLog.objects.create(
-            reservation=reservation,
-            event_type='CUSTOMER_CANCEL',
-            gross_amount=gross_amount,
-            platform_commission=platform_commission,
-            carrier_share=carrier_share,
-            administrative_retention=retention_amount,
-            refund_amount=refund_amount,
-            financial_destination=refund_method
-        )
+        refund_method = request.data.get('refund_method', 'WALLET') # WALLET, CARD
 
-        # Save notification
-        Notification.objects.create(
-            user=reservation.user,
-            tipo='CANCELAMENTO',
-            mensagem=f"A sua reserva {reservation.codigo_reserva} foi cancelada. Reembolso: {refund_amount} Kz creditado na carteira.",
-            enviado=True
-        )
+        with transaction.atomic():
+            reservation = Reservation.objects.select_for_update().get(pk=reservation.pk)
+            reservation.status = 'CANCELADA'
+            reservation.save()
 
-    return Response({
-        'success': 'Reserva cancelada com sucesso.',
-        'refund_amount': float(refund_amount),
-        'retention_amount': float(retention_amount),
-        'financial_destination': refund_method
-    }, status=status.HTTP_200_OK)
+            # Update wallet balance if method is WALLET
+            if refund_method == 'WALLET':
+                profile = reservation.user.profile
+                profile.wallet_balance += refund_amount
+                profile.save()
+
+            # Platform commission & carrier share simulations (10% platform commission)
+            platform_commission = gross_amount * Decimal('0.10')
+            carrier_share = gross_amount - platform_commission
+
+            # Create financial audit log entry
+            FinancialAuditLog.objects.create(
+                reservation=reservation,
+                event_type='CUSTOMER_CANCEL',
+                gross_amount=gross_amount,
+                platform_commission=platform_commission,
+                carrier_share=carrier_share,
+                administrative_retention=retention_amount,
+                refund_amount=refund_amount,
+                financial_destination=refund_method
+            )
+
+            # Save notification for the passenger
+            Notification.objects.create(
+                user=reservation.user,
+                tipo='CANCELAMENTO',
+                mensagem=f"O cancelamento da sua reserva {reservation.codigo_reserva} foi aprovado pelo administrador. Reembolso de {refund_amount} Kz creditado na sua carteira virtual.",
+                enviado=True
+            )
+
+        return Response({
+            'success': 'Reserva cancelada com sucesso pelo administrador.',
+            'refund_amount': float(refund_amount),
+            'retention_amount': float(retention_amount),
+            'financial_destination': refund_method
+        }, status=status.HTTP_200_OK)
+
+    else:
+        return Response({'error': 'Não tem permissão para cancelar este bilhete.'}, status=status.HTTP_403_FORBIDDEN)
 
 # ----------------------------------------------------
 # Boarding Validation (Fiscais)
@@ -1879,6 +1914,9 @@ def reschedule_reservation(request, pk):
         new_trip = Trip.objects.get(pk=new_trip_id)
     except Trip.DoesNotExist:
         return Response({'error': 'Nova viagem não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if new_trip.empresa_id != reservation.trip.empresa_id:
+        return Response({'error': 'A nova viagem deve ser da mesma transportadora.'}, status=status.HTTP_400_BAD_REQUEST)
 
     # 1. Validate reschedule window in carrier/fallback policy
     policy = CancelationPolicy.objects.filter(company_id=reservation.trip.empresa_id, is_active=True).first()

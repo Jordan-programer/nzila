@@ -233,6 +233,7 @@ class ReservationSerializer(serializers.ModelSerializer):
             'PENDENTE': 'PENDENTE',
             'CANCELADA': 'CANCELADO',
             'EMBARCADO': 'EMBARCADO',
+            'PENDENTE_CANCELAMENTO': 'PENDENTE_CANCELAMENTO',
         }
         repr_data['status'] = status_map.get(instance.status, instance.status)
         return repr_data
