@@ -96,12 +96,12 @@ REST_FRAMEWORK = {
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
-# Configuração de E-mail
-EMAIL_BACKEND = 'api.email_backend.HybridEmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
+# Configuração de E-mail (Hostinger)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend' 
+EMAIL_HOST = 'smtp.hostinger.com'
 EMAIL_PORT = 465
 EMAIL_USE_TLS = False
 EMAIL_USE_SSL = True
-EMAIL_HOST_USER = 'marylisboapedro@gmail.com'
-EMAIL_HOST_PASSWORD = 'wpcf ubno huvi qdga'
-DEFAULT_FROM_EMAIL = 'Nzila <marylisboapedro@gmail.com>'
+EMAIL_HOST_USER = 'contact@nzila.online' 
+EMAIL_HOST_PASSWORD = 'Contact2026##'
+DEFAULT_FROM_EMAIL = 'Nzila - Venda de Bilhetes Online <contact@nzila.online>'

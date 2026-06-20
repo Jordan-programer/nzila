@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Star, MapPin } from 'lucide-react';
+import { Star, MapPin, ArrowRight } from 'lucide-react';
 
 export default function FeaturedCarriers() {
   const [carriers, setCarriers] = useState<any[]>([]);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     async function fetchCarriers() {
@@ -32,6 +33,8 @@ export default function FeaturedCarriers() {
     fetchCarriers();
   }, []);
 
+  const visibleCarriers = showAll ? carriers : carriers.slice(0, 4);
+
   return (
     <section className="py-14 lg:py-20 bg-background">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
@@ -48,7 +51,7 @@ export default function FeaturedCarriers() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {carriers?.map((carrier) => (
+          {visibleCarriers?.map((carrier) => (
             <div
               key={carrier?.key}
               className="bg-card border border-border rounded-2xl overflow-hidden card-hover"
@@ -93,6 +96,18 @@ export default function FeaturedCarriers() {
             </div>
           ))}
         </div>
+
+        {carriers.length > 4 && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-accent transition-colors"
+            >
+              {showAll ? 'Ver menos' : 'Ver todas as transportadoras'}
+              <ArrowRight size={16} className={`transition-transform duration-200 ${showAll ? '-rotate-90' : ''}`} />
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

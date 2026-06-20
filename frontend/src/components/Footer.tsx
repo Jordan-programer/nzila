@@ -12,9 +12,9 @@ const footerLinks = {
     { label: 'Carreiras', href: '#', key: 'footer-carreiras' },
   ],
   suporte: [
-    { label: 'Central de Ajuda', href: '#ajuda', key: 'footer-ajuda' },
+    { label: 'Central de Ajuda', href: 'mailto:suporte@nzila.online', key: 'footer-ajuda' },
     { label: 'Política de Cancelamento', href: '#', key: 'footer-cancelamento' },
-    { label: 'Termos de Uso', href: '#', key: 'footer-termos' },
+    { label: 'Termos de Uso', href: '/termos-de-uso', key: 'footer-termos' },
     { label: 'Privacidade', href: '#', key: 'footer-privacidade' },
   ],
   destinos: [
@@ -47,11 +47,11 @@ export default function Footer() {
               </div>
               <div className="flex items-center gap-2 text-sm text-white/60">
                 <Phone size={14} />
-                <span>+244 923 456 789</span>
+                <span>+244 934 266 089</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-white/60">
                 <Mail size={14} />
-                <span>suporte@nzila.ao</span>
+                <span>suporte@nzila.online</span>
               </div>
             </div>
             <div className="flex items-center gap-3 mt-6">

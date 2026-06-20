@@ -1006,10 +1006,10 @@ export default function OperatorDashboardPage() {
                 <p className="text-xs text-muted-foreground">
                   Por favor, corrija os documentos e efetue um novo registo ou contacte-nos em{' '}
                   <a
-                    href="mailto:suporte@nzila.ao"
+                    href="mailto:suporte@nzila.online"
                     className="text-primary hover:underline font-bold"
                   >
-                    suporte@nzila.ao
+                    suporte@nzila.online
                   </a>
                   .
                 </p>

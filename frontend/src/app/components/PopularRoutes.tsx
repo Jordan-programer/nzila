@@ -6,6 +6,7 @@ import { ArrowRight, Clock, TrendingUp } from 'lucide-react';
 
 export default function PopularRoutes() {
   const [routes, setRoutes] = useState<any[]>([]);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     async function fetchPopularRoutes() {
@@ -32,6 +33,8 @@ export default function PopularRoutes() {
     fetchPopularRoutes();
   }, []);
 
+  const visibleRoutes = showAll ? routes : routes.slice(0, 4);
+
   return (
     <section className="py-14 lg:py-20 bg-background" id="destinos">
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
@@ -53,7 +56,7 @@ export default function PopularRoutes() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3 gap-4 lg:gap-5">
-          {routes?.map((route) => (
+          {visibleRoutes?.map((route) => (
             <Link
               key={route?.key}
               href={`/results-page?origem=${encodeURIComponent(route?.origin)}&destino=${encodeURIComponent(route?.destination)}`}
@@ -117,14 +120,17 @@ export default function PopularRoutes() {
           ))}
         </div>
 
-        <div className="mt-6 text-center sm:hidden">
-          <Link
-            href="/results-page"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary"
-          >
-            Ver todas as rotas <ArrowRight size={16} />
-          </Link>
-        </div>
+        {routes.length > 4 && (
+          <div className="mt-8 text-center">
+            <button
+              onClick={() => setShowAll(!showAll)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-accent transition-colors"
+            >
+              {showAll ? 'Ver menos' : 'Ver todas as rotas populares'}
+              <ArrowRight size={16} className={`transition-transform duration-200 ${showAll ? '-rotate-90' : ''}`} />
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
