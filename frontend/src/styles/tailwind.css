@@ -295,6 +295,21 @@
     color: black !important;
   }
 
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .min-h-screen,
+  #root,
+  #__next {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
   /* Collapse non-printable elements completely to prevent blank pages */
   .no-print,
   .no-print * {

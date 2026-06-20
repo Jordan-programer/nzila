@@ -9,6 +9,7 @@ interface Reservation {
   codigo_reserva: string;
   origin: string;
   destination: string;
+  date?: string;
   passengerName: string;
   passengerEmail: string;
   passengerDocument: string;
@@ -21,6 +22,26 @@ interface Reservation {
   carrierColor: string;
   price: number;
   paymentMethod: string;
+}
+
+function formatTripDate(dateStr?: string) {
+  if (!dateStr) return 'N/A';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = Number(parts[0]);
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
+      const months = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      ];
+      return `${day} de ${months[month - 1]}, ${year}`;
+    }
+    return dateStr;
+  } catch (e) {
+    return dateStr;
+  }
 }
 import { toast } from 'sonner';
 import {
@@ -251,7 +272,7 @@ function ConfirmationContent() {
                     </div>
                     <div className="flex justify-between border-b border-slate-200 pb-1.5 text-xs">
                       <span className="text-slate-500 font-medium">Data:</span>
-                      <strong className="text-slate-900">15 de Junho, 2026</strong>
+                      <strong className="text-slate-900">{formatTripDate(reservation.date)}</strong>
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-slate-500 font-medium">Poltrona e Classe:</span>
@@ -426,7 +447,7 @@ function ConfirmationContent() {
                       Data de Partida
                     </span>
                   </div>
-                  <span className="text-sm font-bold text-foreground">15 de Junho, 2026</span>
+                  <span className="text-sm font-bold text-foreground">{formatTripDate(reservation.date)}</span>
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-1.5">

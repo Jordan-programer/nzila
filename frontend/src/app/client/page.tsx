@@ -25,6 +25,7 @@ interface Reservation {
   passengerDocument: string;
   origin: string;
   destination: string;
+  date?: string;
   departureTime: string;
   arrivalTime: string;
   classLabel: string;
@@ -37,6 +38,35 @@ interface Reservation {
   paymentMethod?: string;
   validationDate?: string;
   trip: string | number;
+}
+
+function formatTripDate(dateStr?: string) {
+  if (!dateStr) return 'N/A';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = Number(parts[0]);
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
+      const months = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      ];
+      return `${day} de ${months[month - 1]}, ${year}`;
+    }
+    return dateStr;
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+function formatDateShort(dateStr?: string) {
+  if (!dateStr) return 'N/A';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
 }
 
 interface SimulatedEmail {
@@ -412,7 +442,7 @@ export default function ClientDashboardPage() {
                   <span className="block text-[9px] text-muted-foreground font-black uppercase mb-0.5">
                     Data de Partida
                   </span>
-                  <span className="text-foreground">15 de Junho, 2026</span>
+                  <span className="text-foreground">{formatTripDate(selectedTicket.date)}</span>
                 </div>
                 <div>
                   <span className="block text-[9px] text-muted-foreground font-black uppercase mb-0.5">
@@ -463,7 +493,6 @@ export default function ClientDashboardPage() {
             <div className="px-6 py-4 bg-muted border-t border-border flex justify-end gap-2 no-print">
               <button
                 onClick={() => {
-                  setSelectedTicket(null);
                   window.print();
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 border border-border bg-card hover:bg-muted text-foreground font-bold rounded-xl text-xs transition-colors"
@@ -900,7 +929,7 @@ export default function ClientDashboardPage() {
                                   </strong>
                                 </div>
                                 <div className="flex gap-3 text-xs text-muted-foreground mt-0.5 font-medium">
-                                  <span>Data: 15/06/2026</span>
+                                  <span>Data: {formatDateShort(res.date)}</span>
                                   <span>Poltrona: {res.seat}</span>
                                 </div>
                               </div>
