@@ -49,7 +49,7 @@ export default function FiltersPanel({
     if (allCarriersProp && allCarriersProp.length > 0) return allCarriersProp;
     return [...new Set(trips.map((t) => t.carrier))]
       .filter(Boolean)
-      .map((nome) => ({ id: 0, nome, code: '' }));
+      .map((nome) => ({ id: 0, nome, code: '' } as CarrierOption));
   }, [allCarriersProp, trips]);
 
   const maxPriceLimit = React.useMemo(() => {

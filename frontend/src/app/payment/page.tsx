@@ -16,6 +16,7 @@ interface Trip {
   reviews: number;
   origin: string;
   destination: string;
+  date?: string;
   departureTime: string;
   arrivalTime: string;
   durationLabel: string;
@@ -24,7 +25,28 @@ interface Trip {
   availableSeats: number;
   totalSeats: number;
   price: number;
+  preco_ida_volta?: number | string;
   amenities: string[];
+}
+
+function formatTripDate(dateStr?: string) {
+  if (!dateStr) return 'N/A';
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const year = Number(parts[0]);
+      const month = Number(parts[1]);
+      const day = Number(parts[2]);
+      const months = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      ];
+      return `${day} de ${months[month - 1]}, ${year}`;
+    }
+    return dateStr;
+  } catch (e) {
+    return dateStr;
+  }
 }
 import {
   User,
@@ -57,8 +79,10 @@ function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tripId = searchParams.get('trip');
+  const returnTripId = searchParams.get('return_trip');
 
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [returnTrip, setReturnTrip] = useState<Trip | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
@@ -73,6 +97,8 @@ function CheckoutContent() {
   // Seats State
   const [selectedSeat, setSelectedSeat] = useState<string>('');
   const [occupiedSeats, setOccupiedSeats] = useState<string[]>([]);
+  const [selectedReturnSeat, setSelectedReturnSeat] = useState<string>('');
+  const [occupiedReturnSeats, setOccupiedReturnSeats] = useState<string[]>([]);
 
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState<
@@ -88,13 +114,31 @@ function CheckoutContent() {
   // Reference Payment state
   const [mockRef, setMockRef] = useState({ entidad: '00324', ref: '', valor: 0 });
 
+  // Computed Pricing
+  const outboundPrice = trip ? (trip.preco_ida_volta ? Number(trip.preco_ida_volta) : trip.price) : 0;
+  const returnPrice = returnTrip ? (returnTrip.preco_ida_volta ? Number(returnTrip.preco_ida_volta) : returnTrip.price) : 0;
+  const totalPrice = returnTrip ? (outboundPrice + returnPrice) : outboundPrice;
+
+  // Sync reference payment total
+  useEffect(() => {
+    if (trip) {
+      setMockRef((prev) => ({
+        ...prev,
+        valor: totalPrice,
+      }));
+    }
+  }, [trip, returnTrip, totalPrice]);
+
   // Load trip and user session
   useEffect(() => {
     // 1. Check authentication
     const user = getCurrentUser();
     if (!user) {
       toast.error('Por favor, inicie sessão para concluir a reserva.');
-      router.push(`/sign-up-login-screen?trip=${tripId || ''}`);
+      const redirectParams = new URLSearchParams();
+      if (tripId) redirectParams.append('trip', tripId);
+      if (returnTripId) redirectParams.append('return_trip', returnTripId);
+      router.push(`/sign-up-login-screen?${redirectParams.toString()}`);
       return;
     }
     setCurrentUser(user);
@@ -108,7 +152,7 @@ function CheckoutContent() {
     setUnitelPhone(user.phone?.replace('+244 ', '') || '');
     setPaypayPhone(user.phone?.replace('+244 ', '') || '');
 
-    // 2. Load trip from backend API
+    // 2. Load outbound trip from backend API
     if (!tripId) {
       toast.error('Nenhuma viagem selecionada!');
       router.push('/results-page');
@@ -118,22 +162,20 @@ function CheckoutContent() {
     const fetchTrip = async () => {
       try {
         const res = await fetch(`/api/trips/${tripId}/`);
-        if (!res.ok) throw new Error('Viagem não encontrada no servidor.');
+        if (!res.ok) throw new Error('Viagem de ida não encontrada no servidor.');
         const data = await res.json();
         setTrip(data);
-
-        // Load occupied seats dynamically from API
         setOccupiedSeats(data.occupiedSeats || []);
 
         // Setup Reference details
         const randomRef = Math.floor(100000000 + Math.random() * 900000000)
           .toString()
           .replace(/(\d{3})(\d{3})(\d{3})/, '$1 $2 $3');
-        setMockRef({
+        setMockRef((prev) => ({
+          ...prev,
           entidad: '00294',
           ref: randomRef,
-          valor: data.price,
-        });
+        }));
       } catch (err: any) {
         toast.error(err.message || 'Erro ao carregar detalhes da viagem.');
         router.push('/results-page');
@@ -141,7 +183,23 @@ function CheckoutContent() {
     };
 
     fetchTrip();
-  }, [tripId, router]);
+
+    // 3. Load return trip if returnTripId is present
+    if (returnTripId) {
+      const fetchReturnTrip = async () => {
+        try {
+          const res = await fetch(`/api/trips/${returnTripId}/`);
+          if (!res.ok) throw new Error('Viagem de volta não encontrada no servidor.');
+          const data = await res.json();
+          setReturnTrip(data);
+          setOccupiedReturnSeats(data.occupiedSeats || []);
+        } catch (err: any) {
+          toast.error(err.message || 'Erro ao carregar detalhes da viagem de volta.');
+        }
+      };
+      fetchReturnTrip();
+    }
+  }, [tripId, returnTripId, router]);
 
   // Express countdown timer
   useEffect(() => {
@@ -169,20 +227,27 @@ function CheckoutContent() {
       setStep(2);
     } else if (step === 2) {
       if (!selectedSeat) {
-        toast.warning('Por favor, selecione um assento no mapa.');
+        toast.warning('Por favor, selecione um assento para a viagem de ida.');
+        return;
+      }
+      if (returnTrip && !selectedReturnSeat) {
+        toast.warning('Por favor, selecione um assento para a viagem de volta.');
         return;
       }
       setStep(3);
     }
   };
 
-  const handleSeatClick = (seat: string) => {
-    if (occupiedSeats.includes(seat)) {
+  const handleSeatClick = (seat: string, isReturn = false) => {
+    const activeOccupied = isReturn ? occupiedReturnSeats : occupiedSeats;
+    const activeSelect = isReturn ? setSelectedReturnSeat : setSelectedSeat;
+
+    if (activeOccupied.includes(seat)) {
       toast.error('Este assento já está ocupado. Por favor, escolha outro.');
       return;
     }
-    setSelectedSeat(seat);
-    toast.success(`Assento ${seat} selecionado!`);
+    activeSelect(seat);
+    toast.success(`Assento ${seat} da viagem de ${isReturn ? 'volta' : 'ida'} selecionado!`);
   };
 
   const handlePaymentSuccess = () => {
@@ -211,9 +276,24 @@ function CheckoutContent() {
         if (trip) {
           const user = getCurrentUser();
           const token = user?.token;
+          const commonBody = {
+            paymentMethod:
+              paymentMethod === 'express'
+                ? 'Multicaixa Express'
+                : paymentMethod === 'referencia'
+                  ? 'Pagamento por referência'
+                  : paymentMethod === 'unitel'
+                    ? 'Unitel Money'
+                    : 'PayPay',
+            passengerName,
+            passengerEmail,
+            passengerPhone,
+            passengerDocument,
+          };
 
           try {
-            const res = await fetch('/api/reservations/', {
+            // 1. Book outbound trip
+            const resOutbound = await fetch('/api/reservations/', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -222,32 +302,42 @@ function CheckoutContent() {
               body: JSON.stringify({
                 tripId: trip.id,
                 seat: selectedSeat,
-                paymentMethod:
-                  paymentMethod === 'express'
-                    ? 'Multicaixa Express'
-                    : paymentMethod === 'referencia'
-                      ? 'Pagamento por referência'
-                      : paymentMethod === 'unitel'
-                        ? 'Unitel Money'
-                        : 'PayPay',
-                passengerName,
-                passengerEmail,
-                passengerPhone,
-                passengerDocument,
+                ...commonBody,
               }),
             });
 
-            const resData = await res.json();
-
-            if (res.ok) {
-              toast.success('Reserva confirmada com sucesso!');
-              router.push(`/confirmation?code=${resData.codigo_reserva}`);
-            } else {
-              toast.error(resData.error || 'Erro ao realizar reserva no servidor.');
-              setLoading(false);
+            if (!resOutbound.ok) {
+              const errData = await resOutbound.json();
+              throw new Error(errData.error || 'Erro ao realizar reserva da viagem de ida.');
             }
-          } catch (err) {
-            toast.error('Erro ao comunicar com o servidor.');
+
+            const resDataOutbound = await resOutbound.json();
+
+            // 2. Book return trip if present
+            if (returnTrip) {
+              const resInbound = await fetch('/api/reservations/', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Token ${token}`,
+                },
+                body: JSON.stringify({
+                  tripId: returnTrip.id,
+                  seat: selectedReturnSeat,
+                  ...commonBody,
+                }),
+              });
+
+              if (!resInbound.ok) {
+                const errData = await resInbound.json();
+                throw new Error(errData.error || 'Erro ao realizar reserva da viagem de volta.');
+              }
+            }
+
+            toast.success('Reserva(s) confirmada(s) com sucesso!');
+            router.push(`/confirmation?code=${resDataOutbound.codigo_reserva}`);
+          } catch (err: any) {
+            toast.error(err.message || 'Erro ao comunicar com o servidor.');
             setLoading(false);
           }
         }
@@ -298,9 +388,15 @@ function CheckoutContent() {
   }
 
   // Generate seats grid
-  const renderSeatsGrid = () => {
-    const isVip = trip.class === 'vip';
-    const isExec = trip.class === 'executiva';
+  const renderSeatsGrid = (isReturn = false) => {
+    const activeTrip = isReturn ? returnTrip : trip;
+    if (!activeTrip) return null;
+
+    const activeOccupied = isReturn ? occupiedReturnSeats : occupiedSeats;
+    const activeSelected = isReturn ? selectedReturnSeat : selectedSeat;
+
+    const isVip = activeTrip.class === 'vip';
+    const isExec = activeTrip.class === 'executiva';
     const numSeats = isVip ? 12 : isExec ? 28 : 44;
 
     const rows = [];
@@ -317,15 +413,15 @@ function CheckoutContent() {
         const seatLetter = String.fromCharCode(65 + s);
         const seatLabel = `${seatNum}${seatLetter}`;
 
-        const isOccupied = occupiedSeats.includes(seatLabel);
-        const isSelected = selectedSeat === seatLabel;
+        const isOccupied = activeOccupied.includes(seatLabel);
+        const isSelected = activeSelected === seatLabel;
 
         rowSeats.push(
           <button
             key={seatLabel}
             type="button"
             disabled={isOccupied}
-            onClick={() => handleSeatClick(seatLabel)}
+            onClick={() => handleSeatClick(seatLabel, isReturn)}
             className={`w-10 h-10 lg:w-11 lg:h-11 rounded-lg text-xs font-bold border transition-all flex flex-col items-center justify-center select-none ${
               isOccupied
                 ? 'bg-danger/10 border-danger/25 text-danger/50 cursor-not-allowed opacity-60'
@@ -438,7 +534,7 @@ function CheckoutContent() {
             </h3>
             <p className="text-sm text-muted-foreground text-center mb-6">
               Enviámos uma notificação de pagamento no valor de{' '}
-              <strong className="text-foreground">{trip.price.toLocaleString('pt-AO')} Kz</strong>{' '}
+              <strong className="text-foreground">{totalPrice.toLocaleString('pt-AO')} Kz</strong>{' '}
               para o número <strong className="text-foreground">+244 {expressPhone}</strong>.
             </p>
 
@@ -616,10 +712,23 @@ function CheckoutContent() {
                     ocupadas.
                   </p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-                    <div>{renderSeatsGrid()}</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                    {/* Maps Column */}
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-primary mb-2">Ida: Escolha de Assento</h4>
+                        {renderSeatsGrid(false)}
+                      </div>
+                      {returnTrip && (
+                        <div>
+                          <h4 className="text-xs font-black uppercase text-primary mb-2">Volta: Escolha de Assento</h4>
+                          {renderSeatsGrid(true)}
+                        </div>
+                      )}
+                    </div>
 
-                    <div className="space-y-4 bg-muted/20 border border-border p-5 rounded-2xl">
+                    {/* Summary Column */}
+                    <div className="space-y-4 bg-muted/20 border border-border p-5 rounded-2xl md:sticky md:top-24">
                       <h4 className="font-bold text-foreground text-sm">Resumo da Seleção</h4>
                       <div className="space-y-3">
                         <div className="flex justify-between text-xs font-medium border-b border-border/60 pb-2">
@@ -627,20 +736,32 @@ function CheckoutContent() {
                           <span className="text-foreground font-semibold">{trip.classLabel}</span>
                         </div>
                         <div className="flex justify-between text-xs font-medium border-b border-border/60 pb-2">
-                          <span className="text-muted-foreground">Preço do assento:</span>
-                          <span className="text-foreground font-semibold">
-                            {trip.price.toLocaleString('pt-AO')} Kz
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs font-medium">
-                          <span className="text-muted-foreground">Assento Selecionado:</span>
+                          <span className="text-muted-foreground">Poltrona Ida:</span>
                           {selectedSeat ? (
                             <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold border border-primary/20 rounded-md">
                               Poltrona {selectedSeat}
                             </span>
                           ) : (
-                            <span className="text-danger font-semibold">Nenhum selecionado</span>
+                            <span className="text-danger font-semibold">Não selecionado</span>
                           )}
+                        </div>
+                        {returnTrip && (
+                          <div className="flex justify-between text-xs font-medium border-b border-border/60 pb-2">
+                            <span className="text-muted-foreground">Poltrona Volta:</span>
+                            {selectedReturnSeat ? (
+                              <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-bold border border-primary/20 rounded-md">
+                                Poltrona {selectedReturnSeat}
+                              </span>
+                            ) : (
+                              <span className="text-danger font-semibold">Não selecionado</span>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center text-xs font-medium pt-2 border-t border-border/60">
+                          <span className="text-muted-foreground font-semibold">Preço Total Assentos:</span>
+                          <span className="text-foreground font-bold font-mono text-sm">
+                            {totalPrice.toLocaleString('pt-AO')} Kz
+                          </span>
                         </div>
                       </div>
                       <div className="pt-2">
@@ -661,7 +782,7 @@ function CheckoutContent() {
                     </button>
                     <button
                       onClick={handleNextStep}
-                      disabled={!selectedSeat}
+                      disabled={!selectedSeat || (!!returnTrip && !selectedReturnSeat)}
                       className="flex items-center gap-1.5 px-6 py-3 bg-primary text-primary-foreground hover:bg-accent rounded-xl font-bold text-sm transition-all shadow-sm active:scale-95 disabled:opacity-55 disabled:cursor-not-allowed"
                     >
                       Prosseguir para Pagamento
@@ -885,13 +1006,19 @@ function CheckoutContent() {
 
             {/* Sidebar Summary */}
             <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">
-              <div className="bg-card border border-border rounded-3xl p-5 lg:p-6 shadow-sm">
-                <h3 className="font-bold text-foreground text-base border-b border-border pb-3 mb-4">
+              <div className="bg-card border border-border rounded-3xl p-5 lg:p-6 shadow-sm space-y-6">
+                <h3 className="font-bold text-foreground text-base border-b border-border pb-3 mb-2">
                   Resumo da Viagem
                 </h3>
 
-                {/* Journey Info */}
+                {/* OUTBOUND TRIP SECTION */}
                 <div className="space-y-4">
+                  {returnTrip && (
+                    <div className="inline-block px-2.5 py-0.5 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-md tracking-wider">
+                      Viagem de Ida
+                    </div>
+                  )}
+
                   {/* Origin -> Dest */}
                   <div className="flex items-center justify-between">
                     <div>
@@ -915,7 +1042,9 @@ function CheckoutContent() {
                       <span className="block text-[10px] text-muted-foreground font-black uppercase tracking-wider">
                         Data de Partida
                       </span>
-                      <span className="text-xs font-bold text-foreground">15 de Junho, 2026</span>
+                      <span className="text-xs font-bold text-foreground">
+                        {formatTripDate(trip.date)}
+                      </span>
                     </div>
                     <div className="text-right">
                       <span className="block text-[10px] text-muted-foreground font-black uppercase tracking-wider">
@@ -943,20 +1072,96 @@ function CheckoutContent() {
                         {selectedSeat ? `Poltrona ${selectedSeat}` : 'Não selecionado'}
                       </span>
                     </div>
+                    {returnTrip && (
+                      <div className="flex justify-between border-t border-border/40 pt-2 mt-1">
+                        <span className="text-muted-foreground">Preço Ida:</span>
+                        <span className="font-bold text-foreground">{outboundPrice.toLocaleString('pt-AO')} Kz</span>
+                      </div>
+                    )}
                   </div>
+                </div>
 
-                  {/* Price Total */}
-                  <div className="border-t border-border pt-4 mt-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-foreground">Preço Total:</span>
-                      <span className="text-xl font-black text-primary tabular-nums">
-                        {trip.price.toLocaleString('pt-AO')} Kz
-                      </span>
+                {/* RETURN TRIP SECTION */}
+                {returnTrip && (
+                  <div className="space-y-4 pt-4 border-t border-dashed border-border/80">
+                    <div className="inline-block px-2.5 py-0.5 bg-primary/10 text-primary text-[10px] font-black uppercase rounded-md tracking-wider">
+                      Viagem de Volta
                     </div>
-                    <span className="text-[10px] text-muted-foreground mt-1 block">
-                      Todos os impostos e taxas bancárias incluídos
+
+                    {/* Origin -> Dest */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="block text-[10px] text-muted-foreground font-black uppercase tracking-wider">
+                          Origem
+                        </span>
+                        <span className="text-sm font-bold text-foreground">{returnTrip.origin}</span>
+                      </div>
+                      <ArrowRight size={16} className="text-muted-foreground" />
+                      <div className="text-right">
+                        <span className="block text-[10px] text-muted-foreground font-black uppercase tracking-wider">
+                          Destino
+                        </span>
+                        <span className="text-sm font-bold text-foreground">{returnTrip.destination}</span>
+                      </div>
+                    </div>
+
+                    {/* Date / Time */}
+                    <div className="grid grid-cols-2 gap-4 border-t border-b border-border/60 py-3 my-2">
+                      <div>
+                        <span className="block text-[10px] text-muted-foreground font-black uppercase tracking-wider">
+                          Data de Regresso
+                        </span>
+                        <span className="text-xs font-bold text-foreground">
+                          {formatTripDate(returnTrip.date)}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="block text-[10px] text-muted-foreground font-black uppercase tracking-wider">
+                          Horário
+                        </span>
+                        <span className="text-xs font-bold text-foreground">
+                          {returnTrip.departureTime} às {returnTrip.arrivalTime}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Details carrier / seat */}
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Operadora:</span>
+                        <span className="font-semibold text-foreground">{returnTrip.carrier}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Classe:</span>
+                        <span className="font-semibold text-foreground">{returnTrip.classLabel}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Assento Escolhido:</span>
+                        <span className="font-bold text-primary">
+                          {selectedReturnSeat ? `Poltrona ${selectedReturnSeat}` : 'Não selecionado'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-t border-border/40 pt-2 mt-1">
+                        <span className="text-muted-foreground">Preço Volta:</span>
+                        <span className="font-bold text-foreground">{returnPrice.toLocaleString('pt-AO')} Kz</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Price Total */}
+                <div className="border-t border-border pt-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-foreground">
+                      {returnTrip ? 'Total a Pagar:' : 'Preço Total:'}
+                    </span>
+                    <span className="text-xl font-black text-primary tabular-nums">
+                      {totalPrice.toLocaleString('pt-AO')} Kz
                     </span>
                   </div>
+                  <span className="text-[10px] text-muted-foreground mt-1 block">
+                    Todos os impostos e taxas bancárias incluídos
+                  </span>
                 </div>
               </div>
 

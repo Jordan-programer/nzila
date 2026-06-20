@@ -21,6 +21,8 @@ import Icon from '@/components/ui/AppIcon';
 
 interface TripCardProps {
   trip: Trip;
+  isRoundTrip?: boolean;
+  onSelect?: (trip: Trip) => void;
 }
 
 const AMENITY_ICONS: Record<string, { icon: React.ElementType; label: string }> = {
@@ -59,21 +61,29 @@ function formatDate(dateStr: string) {
   return `${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
 }
 
-export default function TripCard({ trip }: TripCardProps) {
+export default function TripCard({ trip, isRoundTrip, onSelect }: TripCardProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
 
   const seatsPercent = Math.round((trip.availableSeats / trip.totalSeats) * 100);
   const seatsUrgent = trip.availableSeats <= 5;
 
+  const displayedPrice = (isRoundTrip && trip.preco_ida_volta)
+    ? Number(trip.preco_ida_volta)
+    : trip.price;
+
   const handleSelect = () => {
-    // If the user is already logged in, skip the login screen
-    const stored =
-      typeof window !== 'undefined' ? localStorage.getItem('nzila_current_user') : null;
-    if (stored) {
-      router.push(`/payment?trip=${trip.id}`);
+    if (onSelect) {
+      onSelect(trip);
     } else {
-      router.push(`/sign-up-login-screen?trip=${trip.id}`);
+      // If the user is already logged in, skip the login screen
+      const stored =
+        typeof window !== 'undefined' ? localStorage.getItem('nzila_current_user') : null;
+      if (stored) {
+        router.push(`/payment?trip=${trip.id}`);
+      } else {
+        router.push(`/sign-up-login-screen?trip=${trip.id}`);
+      }
     }
   };
 
@@ -194,9 +204,11 @@ export default function TripCard({ trip }: TripCardProps) {
           {/* Price + CTA */}
           <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-3 sm:gap-2 flex-shrink-0">
             <div className="text-right">
-              <div className="text-xs text-muted-foreground mb-0.5">por passageiro</div>
+              <div className="text-xs text-muted-foreground mb-0.5">
+                {isRoundTrip ? 'Preço Ida e Volta' : 'por passageiro'}
+              </div>
               <div className="text-2xl font-bold text-foreground tabular-nums">
-                {trip.price.toLocaleString('pt-AO')} Kz
+                {displayedPrice.toLocaleString('pt-AO')} Kz
               </div>
             </div>
 

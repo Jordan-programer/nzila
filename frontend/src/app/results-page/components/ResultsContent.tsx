@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 import SearchSummaryBar from './SearchSummaryBar';
@@ -29,11 +29,14 @@ const INITIAL_FILTERS: FilterState = {
 };
 
 export default function ResultsContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const originQuery = searchParams.get('origem') || searchParams.get('origin') || '';
   const destQuery = searchParams.get('destino') || searchParams.get('destination') || '';
   const dateQuery = searchParams.get('data') || '';
   const classeQuery = searchParams.get('classe') || '';
+  const tipoQuery = searchParams.get('tipo') || 'ida';
+  const returnDateQuery = searchParams.get('volta') || '';
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [allCarriers, setAllCarriers] = useState<
@@ -43,6 +46,11 @@ export default function ResultsContent() {
   const [sort, setSort] = useState<SortOption>('hora-asc');
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Round-trip Leg State
+  const [currentLeg, setCurrentLeg] = useState<'outbound' | 'inbound'>('outbound');
+  const [selectedOutboundTrip, setSelectedOutboundTrip] = useState<Trip | null>(null);
+  const [selectedInboundTrip, setSelectedInboundTrip] = useState<Trip | null>(null);
 
   useEffect(() => {
     fetch('/api/public/carriers/')
@@ -57,9 +65,19 @@ export default function ResultsContent() {
       try {
         let url = '/api/trips/';
         const queryParams = new URLSearchParams();
-        if (originQuery) queryParams.append('origin', originQuery);
-        if (destQuery) queryParams.append('destination', destQuery);
-        if (dateQuery) queryParams.append('date', dateQuery);
+        
+        if (tipoQuery === 'ida-volta' && currentLeg === 'inbound') {
+          // Inbound query: origin and destination swapped, using return date
+          if (destQuery) queryParams.append('origin', destQuery);
+          if (originQuery) queryParams.append('destination', originQuery);
+          if (returnDateQuery) queryParams.append('date', returnDateQuery);
+        } else {
+          // Outbound query (or single trip)
+          if (originQuery) queryParams.append('origin', originQuery);
+          if (destQuery) queryParams.append('destination', destQuery);
+          if (dateQuery) queryParams.append('date', dateQuery);
+        }
+        
         if (classeQuery) queryParams.append('class', classeQuery);
 
         if (queryParams.toString()) {
@@ -78,7 +96,25 @@ export default function ResultsContent() {
       }
     };
     fetchTrips();
-  }, [originQuery, destQuery, dateQuery, classeQuery]);
+  }, [originQuery, destQuery, dateQuery, returnDateQuery, classeQuery, tipoQuery, currentLeg]);
+
+  const handleTripSelect = (trip: Trip) => {
+    if (tipoQuery === 'ida-volta') {
+      if (currentLeg === 'outbound') {
+        setSelectedOutboundTrip(trip);
+        setCurrentLeg('inbound');
+      } else {
+        setSelectedInboundTrip(trip);
+      }
+    } else {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('nzila_current_user') : null;
+      if (stored) {
+        router.push(`/payment?trip=${trip.id}`);
+      } else {
+        router.push(`/sign-up-login-screen?trip=${trip.id}`);
+      }
+    }
+  };
 
   const filteredAndSorted = useMemo<Trip[]>(() => {
     let result = trips.filter((trip) => {
@@ -143,6 +179,96 @@ export default function ResultsContent() {
 
           {/* Results Column */}
           <div className="flex-1 min-w-0">
+            {/* Step Stepper for round-trip */}
+            {tipoQuery === 'ida-volta' && (
+              <div className="mb-5 bg-primary text-white p-4 rounded-3xl flex items-center justify-between font-bold text-sm shadow-sm animate-fade-in">
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-white text-primary text-xs font-black">
+                    {currentLeg === 'outbound' ? '1' : '2'}
+                  </span>
+                  <span>
+                    {currentLeg === 'outbound'
+                      ? 'Passo 1: Selecione a viagem de Ida'
+                      : 'Passo 2: Selecione a viagem de Volta'}
+                  </span>
+                </div>
+                <span className="text-[10px] uppercase font-black bg-white/20 px-2.5 py-0.5 rounded-full">
+                  {currentLeg === 'outbound' ? 'Ida' : 'Volta'}
+                </span>
+              </div>
+            )}
+
+            {/* Active outbound summary when in inbound leg */}
+            {tipoQuery === 'ida-volta' && selectedOutboundTrip && (
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-5 flex items-center justify-between animate-fade-in">
+                <div className="text-xs font-semibold">
+                  <span className="text-primary block uppercase tracking-wider text-[9px] mb-0.5 font-bold">
+                    Viagem de Ida Selecionada
+                  </span>
+                  <span className="text-foreground font-bold">
+                    {selectedOutboundTrip.origin} → {selectedOutboundTrip.destination}
+                  </span>
+                  <span className="text-muted-foreground ml-3 font-medium">
+                    Partida: {selectedOutboundTrip.departureTime} | Preço: {Number(selectedOutboundTrip.preco_ida_volta || selectedOutboundTrip.price).toLocaleString('pt-AO')} Kz
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedOutboundTrip(null);
+                    setSelectedInboundTrip(null);
+                    setCurrentLeg('outbound');
+                  }}
+                  className="text-xs font-bold text-danger hover:underline hover:opacity-85 transition-opacity"
+                >
+                  Alterar Ida
+                </button>
+              </div>
+            )}
+
+            {/* Selection Complete Panel */}
+            {tipoQuery === 'ida-volta' && selectedOutboundTrip && selectedInboundTrip && (
+              <div className="bg-card border-2 border-primary rounded-3xl p-5 shadow-lg animate-fade-in flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div className="space-y-2">
+                  <h3 className="text-base font-bold text-foreground">
+                    Percurso de Ida e Volta Selecionado
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
+                    <div>
+                      <span className="text-primary block text-[9px] uppercase font-bold">Ida ({selectedOutboundTrip.departureTime})</span>
+                      <span className="text-foreground">{selectedOutboundTrip.origin} → {selectedOutboundTrip.destination}</span>
+                    </div>
+                    <div>
+                      <span className="text-primary block text-[9px] uppercase font-bold">Volta ({selectedInboundTrip.departureTime})</span>
+                      <span className="text-foreground">{selectedInboundTrip.origin} → {selectedInboundTrip.destination}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start md:items-end flex-col gap-1 flex-shrink-0">
+                  <span className="text-[10px] text-muted-foreground font-semibold">Total a pagar:</span>
+                  <span className="text-xl font-black text-emerald-600 tabular-nums">
+                    {(
+                      Number(selectedOutboundTrip.preco_ida_volta || selectedOutboundTrip.price) +
+                      Number(selectedInboundTrip.preco_ida_volta || selectedInboundTrip.price)
+                    ).toLocaleString('pt-AO')} Kz
+                  </span>
+                  <button
+                    onClick={() => {
+                      const stored = typeof window !== 'undefined' ? localStorage.getItem('nzila_current_user') : null;
+                      const destUrl = `/payment?trip=${selectedOutboundTrip.id}&return_trip=${selectedInboundTrip.id}`;
+                      if (stored) {
+                        router.push(destUrl);
+                      } else {
+                        router.push(`/sign-up-login-screen?trip=${selectedOutboundTrip.id}&return_trip=${selectedInboundTrip.id}`);
+                      }
+                    }}
+                    className="mt-1 px-5 py-2.5 bg-primary text-white hover:bg-accent rounded-xl font-bold text-xs shadow-sm active:scale-95 transition-all"
+                  >
+                    Confirmar e Prosseguir
+                  </button>
+                </div>
+              </div>
+            )}
+
             <ResultsHeader
               count={filteredAndSorted.length}
               sort={sort}
@@ -195,7 +321,12 @@ export default function ResultsContent() {
             ) : (
               <div className="space-y-3 lg:space-y-4">
                 {filteredAndSorted.map((trip) => (
-                  <TripCard key={trip.id} trip={trip} />
+                  <TripCard
+                    key={trip.id}
+                    trip={trip}
+                    isRoundTrip={tipoQuery === 'ida-volta'}
+                    onSelect={handleTripSelect}
+                  />
                 ))}
               </div>
             )}

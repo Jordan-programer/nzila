@@ -5,10 +5,10 @@ export interface Trip {
   carrierColor: string;
   carrierLogo?: string;
   origin: string;
-  origin_provincia: string;
+  origin_provincia?: string;
   destination: string;
-  destination_provincia: string;
-  date: string;
+  destination_provincia?: string;
+  date?: string;
   departureTime: string;
   arrivalTime: string;
   durationMinutes: number;
@@ -18,6 +18,7 @@ export interface Trip {
   availableSeats: number;
   totalSeats: number;
   price: number;
+  preco_ida_volta?: number | string;
   amenities: string[];
   rating: number;
   reviews: number;
