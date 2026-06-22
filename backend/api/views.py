@@ -18,7 +18,8 @@ from .models import (
     UserProfile, Company, Location, Route, Bus, Seat,
     Trip, Reservation, ReservationSeat, Payment, Ticket, Notification,
     CompanyAdmin, CompanyDocument, PopularRoute,
-    CancelationPolicy, CancelationPolicyRule, FinancialAuditLog
+    CancelationPolicy, CancelationPolicyRule, FinancialAuditLog,
+    Withdrawal
 )
 from .serializers import (
     UserSerializer,
@@ -34,6 +35,7 @@ from .serializers import (
     NotificationSerializer,
     PopularRouteSerializer,
     BusSerializer,
+    WithdrawalSerializer,
 )
 
 # ----------------------------------------------------
@@ -2088,3 +2090,188 @@ def carrier_operational_cancel(request, trip_id):
         'refunded_count': refunded_count,
         'total_refunded': float(total_refunded)
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def carrier_finance(request):
+    company_id = request.query_params.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+
+    if not company_id:
+        return Response({'error': 'Identificação da transportadora em falta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # 1. Total revenue from active bookings (status: CONFIRMADA, EMBARCADO)
+    total_receitas_agg = Reservation.objects.filter(
+        trip__empresa_id=company_id,
+        status__in=['CONFIRMADA', 'EMBARCADO']
+    ).aggregate(Sum('total'))
+    total_receitas = total_receitas_agg['total__sum'] or Decimal('0.00')
+
+    # 2. Total saques aprovados
+    total_saques_aprovados_agg = Withdrawal.objects.filter(
+        company_id=company_id,
+        status='APROVADO'
+    ).aggregate(Sum('valor'))
+    total_saques_aprovados = total_saques_aprovados_agg['valor__sum'] or Decimal('0.00')
+
+    # 3. Total saques pendentes
+    total_saques_pendentes_agg = Withdrawal.objects.filter(
+        company_id=company_id,
+        status='PENDENTE'
+    ).aggregate(Sum('valor'))
+    total_saques_pendentes = total_saques_pendentes_agg['valor__sum'] or Decimal('0.00')
+
+    # 4. Saldo = total_receitas - total_saques_aprovados
+    saldo = total_receitas - total_saques_aprovados
+
+    # 5. Saldo disponível = saldo - total_saques_pendentes
+    saldo_disponivel = saldo - total_saques_pendentes
+
+    # 6. List of withdrawals
+    withdrawals = Withdrawal.objects.filter(company_id=company_id).order_by('-created_at')
+    serializer = WithdrawalSerializer(withdrawals, many=True, context={'request': request})
+
+    return Response({
+        'company_id': int(company_id),
+        'total_receitas': float(total_receitas),
+        'total_saques_aprovados': float(total_saques_aprovados),
+        'total_saques_pendentes': float(total_saques_pendentes),
+        'saldo': float(saldo),
+        'saldo_disponivel': float(saldo_disponivel),
+        'saques': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def carrier_request_withdrawal(request):
+    company_id = request.data.get('company_id')
+    if not company_id and request.user.is_authenticated:
+        company_id = getattr(getattr(request.user, 'profile', None), 'company_id', None)
+
+    if not company_id:
+        return Response({'error': 'Identificação da transportadora em falta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        company = Company.objects.get(pk=company_id)
+    except Company.DoesNotExist:
+        return Response({'error': 'Transportadora não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    valor_str = request.data.get('valor')
+    dados_bancarios = request.data.get('dados_bancarios')
+
+    if not valor_str or not dados_bancarios:
+        return Response({'error': 'Preencha o valor e os dados bancários para o saque.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        valor = Decimal(str(valor_str))
+    except (ValueError, TypeError):
+        return Response({'error': 'Valor de saque inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if valor <= 0:
+        return Response({'error': 'O valor de saque deve ser superior a zero.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Calculate available balance
+    total_receitas_agg = Reservation.objects.filter(
+        trip__empresa_id=company_id,
+        status__in=['CONFIRMADA', 'EMBARCADO']
+    ).aggregate(Sum('total'))
+    total_receitas = total_receitas_agg['total__sum'] or Decimal('0.00')
+
+    total_saques_aprovados_agg = Withdrawal.objects.filter(
+        company_id=company_id,
+        status='APROVADO'
+    ).aggregate(Sum('valor'))
+    total_saques_aprovados = total_saques_aprovados_agg['valor__sum'] or Decimal('0.00')
+
+    total_saques_pendentes_agg = Withdrawal.objects.filter(
+        company_id=company_id,
+        status='PENDENTE'
+    ).aggregate(Sum('valor'))
+    total_saques_pendentes = total_saques_pendentes_agg['valor__sum'] or Decimal('0.00')
+
+    saldo_disponivel = total_receitas - total_saques_aprovados - total_saques_pendentes
+
+    if valor > saldo_disponivel:
+        return Response({
+            'error': f'Saldo disponível insuficiente. O seu saldo disponível é de {float(saldo_disponivel)} Kz.'
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    # Create the withdrawal request
+    withdrawal = Withdrawal.objects.create(
+        company=company,
+        valor=valor,
+        dados_bancarios=dados_bancarios,
+        status='PENDENTE'
+    )
+
+    # Notify admins about the new withdrawal request
+    admins = UserProfile.objects.filter(role='ADMIN')
+    for admin_profile in admins:
+        Notification.objects.create(
+            user=admin_profile.user,
+            tipo='CONFIRMACAO',
+            mensagem=f"Nova solicitação de saque de {float(valor)} Kz feita pela transportadora '{company.nome}'.",
+            enviado=True
+        )
+
+    serializer = WithdrawalSerializer(withdrawal, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def admin_list_withdrawals(request):
+    withdrawals = Withdrawal.objects.all().order_by('-created_at')
+    serializer = WithdrawalSerializer(withdrawals, many=True, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def admin_review_withdrawal(request, pk):
+    try:
+        withdrawal = Withdrawal.objects.get(pk=pk)
+    except Withdrawal.DoesNotExist:
+        return Response({'error': 'Solicitação de saque não encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    action_status = request.data.get('status')
+    motivo_rejeicao = request.data.get('motivo_rejeicao', '')
+    comprovativo = request.FILES.get('comprovativo')
+
+    if not action_status or action_status.upper() not in ['APROVADO', 'REJEITADO']:
+        return Response({'error': 'Indique um estado válido: APROVADO ou REJEITADO.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    action_status = action_status.upper()
+
+    with transaction.atomic():
+        withdrawal = Withdrawal.objects.select_for_update().get(pk=withdrawal.pk)
+        withdrawal.status = action_status
+        if action_status == 'REJEITADO':
+            withdrawal.motivo_rejeicao = motivo_rejeicao
+        elif action_status == 'APROVADO' and comprovativo:
+            withdrawal.comprovativo = comprovativo
+        withdrawal.save()
+
+        # Create notifications for carrier admins/operators
+        company = withdrawal.company
+        carrier_users = UserProfile.objects.filter(company=company)
+        msg = ""
+        if action_status == 'APROVADO':
+            msg = f"A sua solicitação de saque no valor de {float(withdrawal.valor)} Kz foi APROVADA pelo administrador. O valor foi descontado do seu saldo."
+        else:
+            msg = f"A sua solicitação de saque no valor de {float(withdrawal.valor)} Kz foi REJEITADA. Motivo: {motivo_rejeicao}"
+
+        for p in carrier_users:
+            Notification.objects.create(
+                user=p.user,
+                tipo='CONFIRMACAO',
+                mensagem=msg,
+                enviado=True
+            )
+
+    serializer = WithdrawalSerializer(withdrawal, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+

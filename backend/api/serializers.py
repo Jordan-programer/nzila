@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from .models import (
     UserProfile, Company, Location, Route, Bus, Seat,
     Trip, Reservation, ReservationSeat, Payment, Ticket, Notification,
-    CompanyAdmin, CompanyDocument, PopularRoute
+    CompanyAdmin, CompanyDocument, PopularRoute, Withdrawal
 )
 
 class FiscalSerializer(serializers.ModelSerializer):
@@ -319,3 +319,24 @@ class PopularRouteSerializer(serializers.ModelSerializer):
     class Meta:
         model = PopularRoute
         fields = '__all__'
+
+
+class WithdrawalSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.nome', read_only=True)
+    company_nif = serializers.CharField(source='company.nif', read_only=True)
+    comprovativo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Withdrawal
+        fields = [
+            'id', 'company', 'company_name', 'company_nif', 'valor',
+            'dados_bancarios', 'status', 'motivo_rejeicao', 'comprovativo',
+            'comprovativo_url', 'created_at', 'updated_at'
+        ]
+
+    def get_comprovativo_url(self, obj):
+        if obj.comprovativo:
+            request = self.context.get('request')
+            return request.build_absolute_uri(obj.comprovativo.url) if request else obj.comprovativo.url
+        return None
+

@@ -108,12 +108,28 @@ export default function OperatorDashboardPage() {
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [company, setCompany] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<
-    'frota' | 'localidades' | 'rotas' | 'viagens' | 'reservas' | 'fiscais' | 'operadores' | 'perfil'
+    'frota' | 'localidades' | 'rotas' | 'viagens' | 'reservas' | 'fiscais' | 'operadores' | 'perfil' | 'financeiro'
   >('frota');
 
   // Loading States
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isLoadingData, setIsLoadingData] = useState(false);
+
+  // Finance State
+  const [financeData, setFinanceData] = useState<any>({
+    total_receitas: 0,
+    total_saques_aprovados: 0,
+    total_saques_pendentes: 0,
+    saldo: 0,
+    saldo_disponivel: 0,
+    saques: []
+  });
+  const [isLoadingFinance, setIsLoadingFinance] = useState(false);
+  const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
+  const [withdrawalAmount, setWithdrawalAmount] = useState('');
+  const [withdrawalBankDetails, setWithdrawalBankDetails] = useState('');
+  const [isSubmittingWithdrawal, setIsSubmittingWithdrawal] = useState(false);
+
 
   // Core Data Lists
   const [buses, setBuses] = useState<Bus[]>([]);
@@ -212,6 +228,74 @@ export default function OperatorDashboardPage() {
     checkUser();
   }, [router]);
 
+  const fetchFinanceData = async () => {
+    if (!currentUser) return;
+    setIsLoadingFinance(true);
+    const companyId = currentUser.company_id || 1;
+    try {
+      const res = await fetch(`/api/carrier/finance/?company_id=${companyId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFinanceData(data);
+      } else {
+        toast.error('Erro ao carregar dados financeiros.');
+      }
+    } catch (err) {
+      toast.error('Erro de ligação ao carregar finanças.');
+    } finally {
+      setIsLoadingFinance(false);
+    }
+  };
+
+  const handleRequestWithdrawal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!withdrawalAmount.trim() || !withdrawalBankDetails.trim()) {
+      toast.error('Preencha todos os campos do saque.');
+      return;
+    }
+
+    const valor = parseFloat(withdrawalAmount);
+    if (isNaN(valor) || valor <= 0) {
+      toast.error('Indique um valor superior a zero.');
+      return;
+    }
+
+    if (valor > financeData.saldo_disponivel) {
+      toast.error(`Saldo disponível insuficiente. O seu saldo disponível é de ${financeData.saldo_disponivel.toLocaleString('pt-AO')} Kz.`);
+      return;
+    }
+
+    setIsSubmittingWithdrawal(true);
+    const companyId = currentUser?.company_id || 1;
+
+    try {
+      const res = await fetch('/api/carrier/withdrawals/request/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company_id: companyId,
+          valor: valor,
+          dados_bancarios: withdrawalBankDetails.trim()
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('Solicitação de saque enviada com sucesso!');
+        setIsWithdrawalModalOpen(false);
+        setWithdrawalAmount('');
+        setWithdrawalBankDetails('');
+        await fetchFinanceData();
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Erro ao solicitar saque.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao enviar solicitação de saque.');
+    } finally {
+      setIsSubmittingWithdrawal(false);
+    }
+  };
+
   // Load backend or localStorage data
   useEffect(() => {
     if (!currentUser) return;
@@ -304,6 +388,9 @@ export default function OperatorDashboardPage() {
     } catch (err) {
       // Non-critical, suppress error
     }
+
+    // 9. Fetch Finance Data
+    await fetchFinanceData();
 
     setIsLoadingData(false);
   };
@@ -1056,6 +1143,70 @@ export default function OperatorDashboardPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background relative font-sans text-foreground">
       <Header />
+
+      {/* Withdrawal Modal */}
+      {isWithdrawalModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in font-sans">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-base font-bold text-foreground">Solicitar Novo Saque</h3>
+              <button
+                onClick={() => setIsWithdrawalModalOpen(false)}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <form onSubmit={handleRequestWithdrawal} className="space-y-4 text-sm font-semibold">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Valor a Levantar (Kz) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="any"
+                  placeholder="Ex: 50000"
+                  value={withdrawalAmount}
+                  onChange={(e) => setWithdrawalAmount(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
+                />
+                <span className="block text-[10px] text-muted-foreground mt-1">
+                  Saldo Disponível: {financeData.saldo_disponivel.toLocaleString('pt-AO')} Kz
+                </span>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Dados Bancários (Banco, Titular da Conta & IBAN) *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  placeholder="Ex: Banco BAI&#10;Titular: Macon Transportes Lda&#10;IBAN: AO06.0040.0000.1234.5678.9012.3"
+                  value={withdrawalBankDetails}
+                  onChange={(e) => setWithdrawalBankDetails(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary text-xs"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isSubmittingWithdrawal}
+                className="w-full py-2.5 bg-primary hover:bg-accent text-primary-foreground font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60"
+              >
+                {isSubmittingWithdrawal ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>A processar...</span>
+                  </>
+                ) : (
+                  <span>Solicitar Saque</span>
+                )}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Bus Modal */}
       {isBusModalOpen && (
@@ -1981,6 +2132,7 @@ export default function OperatorDashboardPage() {
                 { id: 'fiscais', label: 'Fiscais', icon: ShieldCheck },
                 { id: 'operadores', label: 'Operadores', icon: Users },
                 { id: 'perfil', label: 'Perfil Empresa', icon: Building2 },
+                { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
               ].map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -2838,6 +2990,162 @@ export default function OperatorDashboardPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {/* TAB: FINANCEIRO (SALDO E SAQUES) */}
+          {activeTab === 'financeiro' && (
+            <div className="space-y-6 animate-fade-in font-sans">
+              {/* Financial Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4">
+                  <div className="p-4 rounded-2xl bg-success/10 text-success">
+                    <DollarSign size={24} />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-muted-foreground uppercase font-black tracking-wider">
+                      Saldo Disponível
+                    </span>
+                    <span className="text-xl font-extrabold text-foreground">
+                      {financeData.saldo_disponivel.toLocaleString('pt-AO')} Kz
+                    </span>
+                    <span className="block text-[9px] text-muted-foreground mt-0.5 font-medium">
+                      Saldo total menos saques pendentes
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4">
+                  <div className="p-4 rounded-2xl bg-primary/10 text-primary">
+                    <Building2 size={24} />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-muted-foreground uppercase font-black tracking-wider">
+                      Total Receitas Reservas
+                    </span>
+                    <span className="text-xl font-extrabold text-foreground">
+                      {financeData.total_receitas.toLocaleString('pt-AO')} Kz
+                    </span>
+                    <span className="block text-[9px] text-muted-foreground mt-0.5 font-medium">
+                      Apenas reservas confirmadas/embarcadas
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4">
+                  <div className="p-4 rounded-2xl bg-amber-500/10 text-amber-600">
+                    <Clock size={24} />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-muted-foreground uppercase font-black tracking-wider">
+                      Total Retirado
+                    </span>
+                    <span className="text-xl font-extrabold text-foreground">
+                      {financeData.total_saques_aprovados.toLocaleString('pt-AO')} Kz
+                    </span>
+                    <span className="block text-[9px] text-muted-foreground mt-0.5 font-medium">
+                      Pendente de aprovação: {financeData.total_saques_pendentes.toLocaleString('pt-AO')} Kz
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Withdrawals List & Request Button */}
+              <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6">
+                <div className="flex items-center justify-between border-b border-border pb-4 flex-wrap gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-foreground">Histórico de Saques</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+                      Consulte o estado das suas transferências e envie novas solicitações de liquidação.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setIsWithdrawalModalOpen(true)}
+                    className="px-4 py-2 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-accent transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus size={14} />
+                    <span>Solicitar Saque</span>
+                  </button>
+                </div>
+
+                {isLoadingFinance ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground text-xs font-semibold">
+                    <Loader2 size={24} className="animate-spin text-primary" />
+                    <span>A carregar dados financeiros...</span>
+                  </div>
+                ) : financeData.saques.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-border rounded-2xl bg-muted/5">
+                    <AlertTriangle size={32} className="mx-auto text-muted-foreground/60 mb-2" />
+                    <h3 className="text-sm font-bold text-foreground mb-1">Nenhum Saque Solicitado</h3>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto font-medium">
+                      Ainda não efetuou nenhuma solicitação de levantamento para os seus dados bancários.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-border text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                          <th className="p-3 pl-0">ID / Data</th>
+                          <th className="p-3">Valor</th>
+                          <th className="p-3">Dados Bancários</th>
+                          <th className="p-3">Estado</th>
+                          <th className="p-3 text-right pr-0">Documentos</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {financeData.saques.map((saque: any) => (
+                          <tr key={saque.id} className="border-b border-border font-semibold text-xs text-foreground">
+                            <td className="p-3 pl-0 text-muted-foreground font-mono">
+                              <span className="block text-foreground font-bold">Saque #{saque.id}</span>
+                              <span className="block text-[10px]">
+                                {new Date(saque.created_at).toLocaleString('pt-AO')}
+                              </span>
+                            </td>
+                            <td className="p-3 font-bold text-sm text-foreground">
+                              {parseFloat(saque.valor).toLocaleString('pt-AO')} Kz
+                            </td>
+                            <td className="p-3 text-muted-foreground text-[11px] max-w-xs whitespace-pre-line leading-relaxed">
+                              {saque.dados_bancarios}
+                            </td>
+                            <td className="p-3">
+                              <span className={`inline-block px-2.5 py-0.5 border rounded-full text-[9px] font-black tracking-wide ${
+                                saque.status === 'APROVADO'
+                                  ? 'bg-success/10 border-success/20 text-success'
+                                  : saque.status === 'PENDENTE'
+                                  ? 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+                                  : 'bg-danger/10 border-danger/20 text-danger'
+                              }`}>
+                                {saque.status}
+                              </span>
+                              {saque.status === 'REJEITADO' && saque.motivo_rejeicao && (
+                                <span className="block text-[10px] text-danger font-medium mt-1 leading-tight">
+                                  Motivo: {saque.motivo_rejeicao}
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right pr-0">
+                              {saque.comprovativo_url ? (
+                                <a
+                                  href={saque.comprovativo_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-muted hover:bg-border text-foreground rounded-lg transition-colors text-[10px] font-bold"
+                                >
+                                  <FileText size={12} />
+                                  <span>Recibo</span>
+                                </a>
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground font-medium">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

@@ -357,3 +357,27 @@ class FinancialAuditLog(models.Model):
     def __str__(self):
         return f"Log {self.id} | {self.event_type} | {self.reservation.codigo_reserva}"
 
+
+# 🏦 16. SAQUES / RETIRADAS DE TRANSPORTADORAS
+class Withdrawal(models.Model):
+    STATUS_CHOICES = [
+        ('PENDENTE', 'PENDENTE'),
+        ('APROVADO', 'APROVADO'),
+        ('REJEITADO', 'REJEITADO'),
+    ]
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='withdrawals')
+    valor = models.DecimalField(max_digits=12, decimal_places=2)
+    dados_bancarios = models.TextField(help_text="IBAN, Banco, Titular, etc.")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE')
+    motivo_rejeicao = models.TextField(blank=True, null=True)
+    comprovativo = models.FileField(upload_to='comprovativos_saques/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'withdrawals'
+
+    def __str__(self):
+        return f"Saque {self.id} | {self.company.nome} | {self.valor} | {self.status}"
+
+

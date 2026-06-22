@@ -63,6 +63,7 @@ import {
   Loader2,
   ArrowRight,
   CheckCircle,
+  FileText,
 } from 'lucide-react';
 
 function AdminDashboardContent() {
@@ -81,7 +82,18 @@ function AdminDashboardContent() {
     | 'relatorios'
     | 'locations'
     | 'rotas_populares'
+    | 'saques'
   >('indicadores');
+
+  // Withdrawals states
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [isLoadingWithdrawals, setIsLoadingWithdrawals] = useState(false);
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const [withdrawalTargetId, setWithdrawalTargetId] = useState<number | null>(null);
+  const [withdrawalRejectionReason, setWithdrawalRejectionReason] = useState('');
+  const [selectedReceiptFile, setSelectedReceiptFile] = useState<File | null>(null);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // On mount: check ?tab= URL param to deep-link directly to a tab
   useEffect(() => {
@@ -455,12 +467,65 @@ function AdminDashboardContent() {
     }
   };
 
+  const fetchWithdrawals = async () => {
+    setIsLoadingWithdrawals(true);
+    try {
+      const res = await fetch('/api/admin/withdrawals/');
+      if (res.ok) {
+        const data = await res.json();
+        setWithdrawals(data);
+      } else {
+        toast.error('Erro ao carregar solicitações de saques.');
+      }
+    } catch (err) {
+      toast.error('Erro de ligação ao carregar saques.');
+    } finally {
+      setIsLoadingWithdrawals(false);
+    }
+  };
+
+  const handleReviewWithdrawal = async (withdrawalId: number, statusChoice: 'APROVADO' | 'REJEITADO') => {
+    setIsSubmittingReview(true);
+    const formData = new FormData();
+    formData.append('status', statusChoice);
+    if (statusChoice === 'REJEITADO') {
+      formData.append('motivo_rejeicao', withdrawalRejectionReason);
+    } else if (statusChoice === 'APROVADO' && selectedReceiptFile) {
+      formData.append('comprovativo', selectedReceiptFile);
+    }
+
+    try {
+      const res = await fetch(`/api/admin/withdrawals/${withdrawalId}/review/`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        toast.success(`Saque ${statusChoice.toLowerCase()} com sucesso!`);
+        setIsApproveModalOpen(false);
+        setIsRejectModalOpen(false);
+        setWithdrawalTargetId(null);
+        setWithdrawalRejectionReason('');
+        setSelectedReceiptFile(null);
+        await fetchWithdrawals();
+      } else {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Erro ao rever o saque.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao submeter revisão de saque.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
   useEffect(() => {
     refreshReservations();
     fetchLocations();
     fetchCarriers();
     fetchPopularRoutes();
     fetchAdminTrips();
+    fetchWithdrawals();
   }, []);
 
   // Calculations
@@ -761,6 +826,105 @@ function AdminDashboardContent() {
                 Guardar Alterações
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Withdrawal Approval Modal */}
+      {isApproveModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-base font-bold text-foreground">Aprovar Solicitação de Saque</h3>
+              <button
+                onClick={() => {
+                  setIsApproveModalOpen(false);
+                  setWithdrawalTargetId(null);
+                  setSelectedReceiptFile(null);
+                }}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-4 font-semibold text-xs text-foreground">
+              <p className="text-muted-foreground font-sans leading-relaxed">
+                Tem a certeza que deseja aprovar este saque? O valor correspondente será retirado do saldo da transportadora.
+              </p>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Anexar Comprovativo de Transferência (Opcional)
+                </label>
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={(e) => setSelectedReceiptFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-accent file:cursor-pointer"
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  onClick={() => handleReviewWithdrawal(withdrawalTargetId!, 'APROVADO')}
+                  disabled={isSubmittingReview}
+                  className="flex-1 py-2.5 bg-success text-success-foreground hover:opacity-90 font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60"
+                >
+                  {isSubmittingReview ? <Loader2 size={14} className="animate-spin" /> : null}
+                  <span>Confirmar Aprovação</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Withdrawal Rejection Modal */}
+      {isRejectModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in font-sans">
+          <div className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl animate-bounce-in">
+            <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+              <h3 className="text-base font-bold text-foreground">Rejeitar Solicitação de Saque</h3>
+              <button
+                onClick={() => {
+                  setIsRejectModalOpen(false);
+                  setWithdrawalTargetId(null);
+                  setWithdrawalRejectionReason('');
+                }}
+                className="p-1 text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-4 font-semibold text-xs text-foreground">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">
+                  Motivo da Rejeição *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Indique o motivo pelo qual este saque está a ser rejeitado..."
+                  value={withdrawalRejectionReason}
+                  onChange={(e) => setWithdrawalRejectionReason(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary text-xs"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!withdrawalRejectionReason.trim()) {
+                      toast.error('Preencha o motivo da rejeição.');
+                      return;
+                    }
+                    handleReviewWithdrawal(withdrawalTargetId!, 'REJEITADO');
+                  }}
+                  disabled={isSubmittingReview}
+                  className="flex-1 py-2.5 bg-danger text-danger-foreground hover:opacity-90 font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-60"
+                >
+                  {isSubmittingReview ? <Loader2 size={14} className="animate-spin" /> : null}
+                  <span>Confirmar Rejeição</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1134,11 +1298,14 @@ function AdminDashboardContent() {
                 { id: 'viagens', label: 'Viagens', icon: Calendar },
                 { id: 'locations', label: 'Localidades', icon: MapPin },
                 { id: 'rotas_populares', label: 'Rotas Populares', icon: TrendingUp },
+                { id: 'saques', label: 'Aprovação de Saques', icon: DollarSign },
               ].map((tab) => {
                 const Icon = tab.icon;
                 const pendingCount =
                   tab.id === 'empresas'
                     ? carriers.filter((c) => c.status === 'PENDENTE').length
+                    : tab.id === 'saques'
+                    ? withdrawals.filter((w) => w.status === 'PENDENTE').length
                     : 0;
                 return (
                   <button
@@ -1147,6 +1314,7 @@ function AdminDashboardContent() {
                       setAdminTab(tab.id as any);
                       if (tab.id === 'empresas') fetchCarriers();
                       if (tab.id === 'viagens') fetchAdminTrips();
+                      if (tab.id === 'saques') fetchWithdrawals();
                     }}
                     className={`relative flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                       adminTab === tab.id
@@ -2211,6 +2379,119 @@ function AdminDashboardContent() {
                             >
                               <Trash2 size={12} />
                             </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 8: Withdrawals Approvals */}
+          {adminTab === 'saques' && (
+            <div className="bg-card border border-border rounded-3xl p-6 lg:p-8 shadow-sm space-y-6 animate-fade-in font-sans">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">Aprovação de Saques</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Analise as solicitações de saque enviadas pelas transportadoras da rede Nzila. Aprove enviando o comprovativo ou rejeite com justificação.
+                </p>
+              </div>
+
+              {isLoadingWithdrawals ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground text-xs font-semibold">
+                  <Loader2 size={24} className="animate-spin text-primary" />
+                  <span>A carregar solicitações de saques...</span>
+                </div>
+              ) : withdrawals.length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-border rounded-2xl bg-muted/5">
+                  <DollarSign size={32} className="mx-auto text-muted-foreground/60 mb-2" />
+                  <h3 className="text-sm font-bold text-foreground mb-1">Sem Solicitações</h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto font-medium">
+                    Não existem solicitações de saques no sistema atualmente.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground text-[10px] font-black uppercase tracking-wider">
+                        <th className="p-3 pl-0">Transportadora</th>
+                        <th className="p-3">Valor</th>
+                        <th className="p-3">Dados de Transferência</th>
+                        <th className="p-3">Data Solicitação</th>
+                        <th className="p-3">Estado</th>
+                        <th className="p-3 text-right pr-0">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {withdrawals.map((saque) => (
+                        <tr key={saque.id} className="border-b border-border font-semibold text-xs text-foreground">
+                          <td className="p-3 pl-0">
+                            <span className="block text-foreground font-bold">{saque.company_name}</span>
+                            <span className="block text-[10px] text-muted-foreground font-mono">NIF: {saque.company_nif}</span>
+                          </td>
+                          <td className="p-3 font-bold text-sm text-foreground">
+                            {parseFloat(saque.valor).toLocaleString('pt-AO')} Kz
+                          </td>
+                          <td className="p-3 text-muted-foreground text-[11px] whitespace-pre-line leading-relaxed">
+                            {saque.dados_bancarios}
+                          </td>
+                          <td className="p-3 text-muted-foreground text-[11px]">
+                            {new Date(saque.created_at).toLocaleString('pt-AO')}
+                          </td>
+                          <td className="p-3">
+                            <span className={`inline-block px-2.5 py-0.5 border rounded-full text-[9px] font-black tracking-wide ${
+                              saque.status === 'APROVADO'
+                                ? 'bg-success/10 border-success/20 text-success'
+                                : saque.status === 'PENDENTE'
+                                ? 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+                                : 'bg-danger/10 border-danger/20 text-danger'
+                            }`}>
+                              {saque.status}
+                            </span>
+                            {saque.status === 'REJEITADO' && saque.motivo_rejeicao && (
+                              <span className="block text-[10px] text-danger font-medium mt-1 leading-tight">
+                                Motivo: {saque.motivo_rejeicao}
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right pr-0 flex items-center justify-end gap-2">
+                            {saque.status === 'PENDENTE' ? (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setWithdrawalTargetId(saque.id);
+                                    setIsApproveModalOpen(true);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-success text-success-foreground hover:opacity-90 font-bold rounded-lg text-[10px] transition-colors"
+                                >
+                                  Aprovar
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setWithdrawalTargetId(saque.id);
+                                    setIsRejectModalOpen(true);
+                                  }}
+                                  className="px-2.5 py-1.5 bg-danger text-danger-foreground hover:opacity-90 font-bold rounded-lg text-[10px] transition-colors"
+                                >
+                                  Rejeitar
+                                </button>
+                              </>
+                            ) : saque.comprovativo_url ? (
+                              <a
+                                href={saque.comprovativo_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-muted hover:bg-border text-foreground rounded-lg transition-colors text-[10px] font-bold"
+                              >
+                                <FileText size={12} />
+                                <span>Recibo</span>
+                              </a>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground font-medium">-</span>
+                            )}
                           </td>
                         </tr>
                       ))}

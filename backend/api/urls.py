@@ -39,6 +39,8 @@ urlpatterns = [
     # Carrier Admin Admin Reviews
     path('admin/carriers/', views.admin_list_carriers, name='admin_list_carriers'),
     path('admin/carriers/review/', views.admin_review_carrier, name='admin_review_carrier'),
+    path('admin/withdrawals/', views.admin_list_withdrawals, name='admin_list_withdrawals'),
+    path('admin/withdrawals/<int:pk>/review/', views.admin_review_withdrawal, name='admin_review_withdrawal'),
 
     # Carrier Management Operations
     path('carrier/info/', views.carrier_info, name='carrier_info'),
@@ -54,6 +56,8 @@ urlpatterns = [
     path('carrier/operators/', views.carrier_manage_operators, name='carrier_manage_operators'),
     path('carrier/operators/<int:pk>/', views.carrier_manage_operators, name='carrier_manage_operator_detail'),
     path('carrier/reservations/', views.carrier_manage_reservations, name='carrier_manage_reservations'),
+    path('carrier/finance/', views.carrier_finance, name='carrier_finance'),
+    path('carrier/withdrawals/request/', views.carrier_request_withdrawal, name='carrier_request_withdrawal'),
     path('notifications/', views.list_notifications, name='list_notifications'),
     path('notifications/<str:pk>/read/', views.mark_notification_read, name='mark_notification_read'),
     path('notifications/read-all/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
