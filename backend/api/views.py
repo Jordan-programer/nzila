@@ -2123,8 +2123,12 @@ def carrier_finance(request):
     ).aggregate(Sum('valor'))
     total_saques_pendentes = total_saques_pendentes_agg['valor__sum'] or Decimal('0.00')
 
-    # 4. Saldo = total_receitas - total_saques_aprovados
-    saldo = total_receitas - total_saques_aprovados
+    # Platform commission (10% on total revenues)
+    comissao = total_receitas * Decimal('0.10')
+    receita_liquida = total_receitas - comissao
+
+    # 4. Saldo = receita_liquida - total_saques_aprovados
+    saldo = receita_liquida - total_saques_aprovados
 
     # 5. Saldo disponível = saldo - total_saques_pendentes
     saldo_disponivel = saldo - total_saques_pendentes
@@ -2136,6 +2140,8 @@ def carrier_finance(request):
     return Response({
         'company_id': int(company_id),
         'total_receitas': float(total_receitas),
+        'total_comissao': float(comissao),
+        'receita_liquida': float(receita_liquida),
         'total_saques_aprovados': float(total_saques_aprovados),
         'total_saques_pendentes': float(total_saques_pendentes),
         'saldo': float(saldo),
@@ -2192,11 +2198,13 @@ def carrier_request_withdrawal(request):
     ).aggregate(Sum('valor'))
     total_saques_pendentes = total_saques_pendentes_agg['valor__sum'] or Decimal('0.00')
 
-    saldo_disponivel = total_receitas - total_saques_aprovados - total_saques_pendentes
+    # Apply 10% platform commission on total revenues
+    comissao = total_receitas * Decimal('0.10')
+    saldo_disponivel = total_receitas - comissao - total_saques_aprovados - total_saques_pendentes
 
     if valor > saldo_disponivel:
         return Response({
-            'error': f'Saldo disponível insuficiente. O seu saldo disponível é de {float(saldo_disponivel)} Kz.'
+            'error': f'Saldo disponível insuficiente. O seu saldo disponível (com desconto de 10% de comissão) é de {float(saldo_disponivel)} Kz.'
         }, status=status.HTTP_400_BAD_REQUEST)
 
     # Create the withdrawal request

@@ -29,6 +29,7 @@ import {
   Bus as BusIcon,
   Map,
   Upload,
+  Percent,
 } from 'lucide-react';
 
 interface UserSession {
@@ -118,6 +119,8 @@ export default function OperatorDashboardPage() {
   // Finance State
   const [financeData, setFinanceData] = useState<any>({
     total_receitas: 0,
+    total_comissao: 0,
+    receita_liquida: 0,
     total_saques_aprovados: 0,
     total_saques_pendentes: 0,
     saldo: 0,
@@ -1173,7 +1176,7 @@ export default function OperatorDashboardPage() {
                   className="w-full px-4 py-2.5 border border-input rounded-xl bg-background text-foreground focus:outline-none focus:border-primary"
                 />
                 <span className="block text-[10px] text-muted-foreground mt-1">
-                  Saldo Disponível: {financeData.saldo_disponivel.toLocaleString('pt-AO')} Kz
+                  Saldo Disponível: {(financeData.saldo_disponivel || 0).toLocaleString('pt-AO')} Kz (Comissão de 10% já deduzida)
                 </span>
               </div>
               <div>
@@ -2997,7 +3000,7 @@ export default function OperatorDashboardPage() {
           {activeTab === 'financeiro' && (
             <div className="space-y-6 animate-fade-in font-sans">
               {/* Financial Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4">
                   <div className="p-4 rounded-2xl bg-success/10 text-success">
                     <DollarSign size={24} />
@@ -3007,10 +3010,10 @@ export default function OperatorDashboardPage() {
                       Saldo Disponível
                     </span>
                     <span className="text-xl font-extrabold text-foreground">
-                      {financeData.saldo_disponivel.toLocaleString('pt-AO')} Kz
+                      {(financeData.saldo_disponivel || 0).toLocaleString('pt-AO')} Kz
                     </span>
                     <span className="block text-[9px] text-muted-foreground mt-0.5 font-medium">
-                      Saldo total menos saques pendentes
+                      Saldo líquido (comissão de 10% já deduzida)
                     </span>
                   </div>
                 </div>
@@ -3021,13 +3024,30 @@ export default function OperatorDashboardPage() {
                   </div>
                   <div>
                     <span className="block text-[10px] text-muted-foreground uppercase font-black tracking-wider">
-                      Total Receitas Reservas
+                      Receitas Totais
                     </span>
                     <span className="text-xl font-extrabold text-foreground">
-                      {financeData.total_receitas.toLocaleString('pt-AO')} Kz
+                      {(financeData.total_receitas || 0).toLocaleString('pt-AO')} Kz
                     </span>
                     <span className="block text-[9px] text-muted-foreground mt-0.5 font-medium">
-                      Apenas reservas confirmadas/embarcadas
+                      Faturação bruta em reservas confirmadas/embarcadas
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm flex items-center gap-4">
+                  <div className="p-4 rounded-2xl bg-danger/10 text-danger animate-pulse">
+                    <Percent size={24} />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-muted-foreground uppercase font-black tracking-wider">
+                      Comissão Retida (10%)
+                    </span>
+                    <span className="text-xl font-extrabold text-foreground">
+                      {(financeData.total_comissao || 0).toLocaleString('pt-AO')} Kz
+                    </span>
+                    <span className="block text-[9px] text-muted-foreground mt-0.5 font-medium">
+                      Taxa de comissão da plataforma Nzila
                     </span>
                   </div>
                 </div>
@@ -3041,10 +3061,10 @@ export default function OperatorDashboardPage() {
                       Total Retirado
                     </span>
                     <span className="text-xl font-extrabold text-foreground">
-                      {financeData.total_saques_aprovados.toLocaleString('pt-AO')} Kz
+                      {(financeData.total_saques_aprovados || 0).toLocaleString('pt-AO')} Kz
                     </span>
                     <span className="block text-[9px] text-muted-foreground mt-0.5 font-medium">
-                      Pendente de aprovação: {financeData.total_saques_pendentes.toLocaleString('pt-AO')} Kz
+                      Pendente: {(financeData.total_saques_pendentes || 0).toLocaleString('pt-AO')} Kz
                     </span>
                   </div>
                 </div>
