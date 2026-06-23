@@ -13,6 +13,33 @@ const navLinks = [
   { label: 'Sobre Nós', href: '/sobre-nos', key: 'nav-about' },
 ];
 
+const getNotificationSubject = (tipo: string, mensagem: string): string => {
+  const msg = (mensagem || '').toLowerCase();
+  if (msg.includes('saque') || msg.includes('retirada')) {
+    return 'Nzila: Saque / Financeiro';
+  }
+  if (msg.includes('embarque') || msg.includes('validado pelo fiscal')) {
+    return 'Nzila: Confirmação de Embarque';
+  }
+  if (msg.includes('remarcado') || msg.includes('alteração') || msg.includes('alterado')) {
+    return 'Nzila: Alteração de Viagem';
+  }
+  if (msg.includes('cancelada') || msg.includes('cancelamento') || msg.includes('cancelado')) {
+    return 'Nzila: Alerta / Cancelamento';
+  }
+  if (msg.includes('candidatura') || msg.includes('conta de') || msg.includes('operador') || msg.includes('fiscal')) {
+    return 'Nzila: Cadastro / Acesso';
+  }
+  if (msg.includes('otp') || msg.includes('verificação') || msg.includes('código')) {
+    return 'Nzila: Código de Verificação';
+  }
+  
+  if (tipo === 'CONFIRMACAO') return 'Nzila: Confirmação';
+  if (tipo === 'LEMBRETE') return 'Nzila: Lembrete';
+  if (tipo === 'CANCELAMENTO') return 'Nzila: Alerta / Cancelamento';
+  return 'Nzila: Notificação';
+};
+
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -112,12 +139,7 @@ export default function Header() {
             const backendNotifs = data.map((item: any) => ({
               id: `db-${item.id}`,
               recipient: userEmail,
-              subject:
-                item.tipo === 'CONFIRMACAO'
-                  ? 'Nzila: Confirmação / Registo'
-                  : item.tipo === 'LEMBRETE'
-                    ? 'Nzila: Lembrete'
-                    : 'Nzila: Alerta / Cancelamento',
+              subject: getNotificationSubject(item.tipo, item.mensagem),
               snippet: item.mensagem,
               sentAt: item.created_at,
               lida: item.lida,
